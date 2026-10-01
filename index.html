@@ -1905,7 +1905,16 @@
   // ⚠️ Bei einem NETZfehler wird trotzdem freigegeben. Wer sich einmal angemeldet
   // hat, darf nicht ausgesperrt werden, weil gerade die Leitung hakt – die
   // Firebase-Daten sind ohnehin nicht durch dieses Konto geschützt.
+  // KLON: Sprung von der AGE-LAN-Website direkt in einen Bereich (?bereich=essen).
+  // Angemeldet → App geht dort auf; sonst öffnet sich die Anmeldung mit diesem Ziel.
+  var BEREICHE = ['turnier', 'stream', 'fruehstueck', 'essen', 'downloads'];
+  var wunsch = null;
+  try { wunsch = new URLSearchParams(window.location.search).get('bereich'); } catch (e) { /* alte Browser */ }
+  if (BEREICHE.indexOf(wunsch) < 0) wunsch = null;
+  if (wunsch) zielTab = wunsch;
+
   var konto = kontoLesen();
+  if (wunsch && !(konto && konto.token)) oeffneGate(wunsch);
   if (konto && konto.token) {
     kontoAnzeigen(konto);
     fetch(GATEWAY, {
@@ -1950,6 +1959,7 @@
         // da“, nicht „Konto weg“ – dann gilt dasselbe wie beim Netzfehler unten.
         kontoSchreiben(null);
         kontoAnzeigen(null);
+        if (wunsch) oeffneGate(wunsch);
       } else {
         freigeben();
       }
