@@ -1,0 +1,72 @@
+/* ==========================================================================
+   KLON: Aussehen im Einbett-Modus (?eingebettet=1, iframe der AGE-LAN-Website).
+   Übernimmt Farben und Schriften der Website (agelan-backend/css/style.css):
+   dunkel, Gold als Akzent, Oswald für Überschriften, Source Sans für Text.
+   Die Schriften kommen von der Website selbst (gleiche Herkunft, kein Google).
+   ========================================================================== */
+@font-face { font-family: "Oswald"; font-weight: 500 600; font-display: swap; src: url("/agelan-backend/fonts/oswald.woff2") format("woff2"); }
+@font-face { font-family: "Source Sans 3"; font-weight: 400 700; font-display: swap; src: url("/agelan-backend/fonts/source-sans-3.woff2") format("woff2"); }
+
+html.eingebettet,
+html.eingebettet[data-theme] {
+  --bg: #08090d;
+  --card-bg: #15161b;
+  --border: #25262c;
+  --text: #ece9e1;
+  --muted: #9b9aa5;
+  --primary: #e2ad44;
+  --primary-dark: #c9952f;
+  --primary-akzent: #e8b64c;
+  --gold: #e8b64c;
+  --gold-text: #f8dc95;
+  --success: #3fbf6f;
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+html.eingebettet body {
+  font-family: "Source Sans 3", "Segoe UI", Arial, sans-serif;
+  font-size: 16px;
+  background: var(--bg);
+}
+html.eingebettet h1,
+html.eingebettet h2,
+html.eingebettet h3,
+html.eingebettet .ub-titel {
+  font-family: "Oswald", "Arial Narrow", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Gold als Fläche → dunkle Schrift darauf (die App setzt dort Weiß) */
+html.eingebettet .btn-primary,
+html.eingebettet .pw-knopf,
+html.eingebettet .mini-btn.primary,
+html.eingebettet .sk-chip.aktiv,
+html.eingebettet .sk-slot,
+html.eingebettet .es-plus:active,
+html.eingebettet .ub-punkt.aktiv,
+html.eingebettet .neu-balken { color: #1c1305; }
+html.eingebettet .btn-primary:hover { background: #f0bd55; }
+
+/* Reiterleiste wie die Navigation der Website */
+html.eingebettet nav.tabs {
+  background: #101116;
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+}
+html.eingebettet nav.tabs button {
+  color: var(--muted);
+  border-radius: 0;
+  font-size: 15px;
+}
+html.eingebettet nav.tabs button:hover { background: none; color: var(--text); }
+html.eingebettet nav.tabs button.active { color: var(--text); border-bottom-color: var(--gold); }
+
+/* Eingaben und Karten etwas kantiger, wie auf der Website */
+html.eingebettet input,
+html.eingebettet select,
+html.eingebettet textarea { border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); border-color: var(--border); }
+html.eingebettet input:focus,
+html.eingebettet select:focus,
+html.eingebettet textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232, 182, 76, 0.15); }

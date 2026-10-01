@@ -14,7 +14,20 @@
 <script src="thema.js?v=1.0"></script>
 <!-- KLON: ?eingebettet=1 = läuft im iframe der AGE-LAN-Website. Dann ohne
      eigenen Kopf, ohne Vorraum und ohne Klon-Hinweis – die Website ist der Rahmen. -->
-<script>try { if (/[?&]eingebettet=1(?:&|$)/.test(location.search)) document.documentElement.classList.add('eingebettet'); } catch (e) {}</script>
+<script>
+try {
+  if (/[?&]eingebettet=1(?:&|$)/.test(location.search)) {
+    var wurzel = document.documentElement;
+    wurzel.classList.add('eingebettet');
+    // Immer dunkel wie die Website – thema.js stellt sonst nach Sonnenstand um.
+    wurzel.setAttribute('data-theme', 'dark');
+    new MutationObserver(function () {
+      if (wurzel.getAttribute('data-theme') !== 'dark') wurzel.setAttribute('data-theme', 'dark');
+    }).observe(wurzel, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+} catch (e) {}
+</script>
+<link rel="stylesheet" href="eingebettet.css?v=1">
 <style>.eingebettet .klon-band, .eingebettet .kopfzeile, .eingebettet #start-hub { display: none !important; }</style>
 <!-- Zwangsaktualisierung: neue Fassung online → Seite lädt neu (siehe Datei). -->
 <script src="aktualisieren.js?v=1.1"></script>
