@@ -70,3 +70,6 @@ html.eingebettet textarea { border-radius: 4px; background: rgba(0, 0, 0, 0.35);
 html.eingebettet input:focus,
 html.eingebettet select:focus,
 html.eingebettet textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232, 182, 76, 0.15); }
+
+/* Hell/Dunkel-Wahl entfällt: eingebettet ist die App immer dunkel wie die Website. */
+html.eingebettet .thema-block { display: none !important; }
