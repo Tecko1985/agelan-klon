@@ -9,6 +9,8 @@
 | Worker | `agelan.michel-brunner.workers.dev` | `agelan-klon.michel-brunner.workers.dev` (Binding `DB` = D1 agelan-backend) |
 | Daten (Turniere, Essen …) | Firebase `agelan-ab042` | **lokaler Test-Modus**, bis ein eigenes Firebase-Projekt eingetragen ist (`firebase-config.js`, FIREBASE-SETUP.md) |
 
+**Keine Veranstalter-PINs:** `ohne-pin.js` blendet alle PIN-Felder und PIN-Anmeldungen aus und setzt beim Anlegen eine zufällige PIN. Verwalten dürfen Orga und Veranstalter über ihr Konto (feste Gruppe auf der Website); die Teilnehmer wechseln je LAN und werden beim Check-in freigeschaltet. Damit andere Orga-Geräte als das anlegende verwalten können, braucht der Klon ein eigenes Firebase-Projekt mit `FIREBASE_DIENSTKONTO` (Rollen-Claims).
+
 Rollen werden in beide Richtungen geteilt: 🛠 Orga / ⭐ Veranstalter / Streamer aus der App landen in der Website-Datenbank und umgekehrt. Die Discord-ID pflegt jede:r in der App („Mein Konto“).
 
 Für Firebase-Rollen (⭐/🛠 ohne PIN) braucht der Klon-Worker das Secret `FIREBASE_DIENSTKONTO` des **Klon**-Firebase-Projekts; `UB_PROJEKT` in `uebersicht-app.js` dann auf dessen Projekt-ID setzen.
