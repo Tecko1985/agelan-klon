@@ -73,3 +73,6 @@ html.eingebettet textarea:focus { outline: none; border-color: var(--gold); box-
 
 /* Hell/Dunkel-Wahl entfällt: eingebettet ist die App immer dunkel wie die Website. */
 html.eingebettet .thema-block { display: none !important; }
+
+/* QR-Knopf in der Reiterleiste entfällt: die Website hat eigene Ticket-QR-Codes. */
+html.eingebettet #nav-qr { display: none !important; }
