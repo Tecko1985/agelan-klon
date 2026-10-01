@@ -1,0 +1,2051 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgeLan (Klon) – alles zur LAN</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1b2d4f">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css?v=6.18">
+<!-- Hell/Dunkel VOR dem ersten Zeichnen setzen (sonst blitzt es nachts hell). -->
+<!-- Verbindungen zu Firebase schon aufbauen, während das Passwort geprüft wird. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<script src="thema.js?v=1.0"></script>
+<!-- Zwangsaktualisierung: neue Fassung online → Seite lädt neu (siehe Datei). -->
+<script src="aktualisieren.js?v=1.1"></script>
+</head>
+<body>
+<div style="background:repeating-linear-gradient(45deg,#fff4d6,#fff4d6 12px,#ffeab0 12px,#ffeab0 24px);color:#6b4b00;text-align:center;font:600 13px system-ui,sans-serif;padding:6px 12px;border-bottom:1px solid #e5c56a">🧪 Klon der AgeLan-App – angebunden an die <a href="https://tecko1985.github.io/agelan-backend/" style="color:#6b4b00">AGE-LAN-Website</a>. Daten vorerst nur in diesem Browser.</div>
+
+<!-- Vorraum: für alle offen. Zeigt, was es auf der AgeLan gibt, ohne dass dafür
+     ein Passwort nötig wäre. Erst der Klick auf einen Bereich öffnet die
+     Passwortabfrage – und erst deren Freigabe lädt die App-Skripte nach.
+     ⚠️ Vor der Freigabe steht bewusst KEINE Firebase-Verbindung: die Kacheln
+     hier sind statisches HTML, keine Daten aus der Datenbank. -->
+<div id="start-hub" class="hub">
+  <div class="hub-box">
+    <!-- Das Banner ersetzt das frühere 🏆-Emoji. Als JPEG in Zielgröße (700 px,
+         73 KB) statt der 855-KB-Vorlage: es lädt bei jedem Aufruf mit. -->
+    <img class="hub-banner" src="banner.jpg?v=1.0" alt="AGE LAN #3 – 01. bis 04. Oktober" width="700" height="559">
+    <p class="hub-untertitel">Alles zur LAN an einem Ort.</p>
+
+    <button type="button" class="hub-kachel" data-hub-ziel="turnier">
+      <span class="hub-icon">🏆</span>
+      <span class="hub-kachel-text">
+        <span class="hub-name">Turnier</span>
+        <span class="hub-beschreibung">Alle Turniere der Veranstaltung – einschreiben, Ergebnisse melden, Tabellen und Bracket verfolgen.</span>
+      </span>
+      <span class="hub-schloss" aria-hidden="true">🔒</span>
+    </button>
+
+    <button type="button" class="hub-kachel" data-hub-ziel="stream">
+      <span class="hub-icon">📺</span>
+      <span class="hub-kachel-text">
+        <span class="hub-name">Stream</span>
+        <span class="hub-beschreibung">Der Sendeplan über alle Tage – wer sendet wann vom Kanal.</span>
+      </span>
+      <span class="hub-schloss" aria-hidden="true">🔒</span>
+    </button>
+
+    <button type="button" class="hub-kachel" data-hub-ziel="fruehstueck">
+      <span class="hub-icon">🥐</span>
+      <span class="hub-kachel-text">
+        <span class="hub-name">Frühstück</span>
+        <span class="hub-beschreibung">Frühstückspakete für den nächsten Morgen – bestellt wird am Abend vorher.</span>
+      </span>
+      <span class="hub-schloss" aria-hidden="true">🔒</span>
+    </button>
+
+    <button type="button" class="hub-kachel" data-hub-ziel="essen">
+      <span class="hub-icon">🍕</span>
+      <span class="hub-kachel-text">
+        <span class="hub-name">Essen</span>
+        <span class="hub-beschreibung">Warmes Essen vom Lieferanten – Karte ansehen, zusammenstellen, vorne bezahlen, abholen.</span>
+      </span>
+      <span class="hub-schloss" aria-hidden="true">🔒</span>
+    </button>
+
+    <button type="button" class="hub-kachel" data-hub-ziel="downloads">
+      <span class="hub-icon">📥</span>
+      <span class="hub-kachel-text">
+        <span class="hub-name">Downloads</span>
+        <span class="hub-beschreibung">Werkzeuge zum Herunterladen – z. B. der Klickzähler fürs 2vs2-Coop-Turnier.</span>
+      </span>
+      <span class="hub-schloss" aria-hidden="true">🔒</span>
+    </button>
+
+    <!-- Was die App kann. ⚠️ Diese App hat KEINEN Info-Reiter (seit 2026-09-03),
+         darum steht die Karte „Funktionen“ hier im Vorraum – über dem
+         Datenschutz, wie in der übrigen Flotte. Gefüllt wird sie von einem
+         eigenen Skriptblock am Ende dieser Datei und NICHT aus app.js: der
+         Vorraum ist vor der Anmeldung sichtbar, app.js wird erst nach der
+         Freigabe nachgeladen. Eine Liste aus app.js bliebe hier leer. -->
+    <details class="hub-ds hub-funktionen">
+      <summary>Funktionen</summary>
+      <div class="hub-ds-text">
+        <div id="funktionen-list"></div>
+      </div>
+    </details>
+
+    <!-- ⚠️ Der Datenschutz-Hinweis stand bis 2026-09-03 im Info-Reiter. Der ist
+         weg (Michel: die Änderungsliste braucht niemand), der Hinweis MUSS aber
+         bleiben: die App speichert Namen und Bestellungen bei Google. Hier steht
+         er sogar besser – im Vorraum sieht ihn jede:r VOR der Anmeldung. -->
+    <details class="hub-ds">
+      <summary>Datenschutz</summary>
+      <div class="hub-ds-text">
+        <p>Die AgeLan ist eine <strong>private Veranstaltung</strong>, kein Angebot
+        eines Vereins. Diese Seite gehört und wird betrieben von
+        <strong>Michel Brunner</strong>; erreichbar über den Discord der AgeLan.</p>
+
+        <p><strong>Was gespeichert wird:</strong> der Name, unter dem du dich anmeldest,
+        und dein Passwort (verschlüsselt, nicht lesbar). Dazu, was du selbst einträgst –
+        Turnier-Anmeldungen und Ergebnisse, Sendezeiten im Streamplan, Frühstücks- und
+        Essensbestellungen. Keine E-Mail-Adresse, keine Anschrift, keine Werbung.</p>
+
+        <p><strong>Freiwillig: deine Discord-Benutzer-ID.</strong> Wenn du sie unter
+        „Mein Konto“ einträgst, schickt dir der AgeLan-Bot eine Direktnachricht, sobald dein
+        Essen zum Abholen bereitliegt. Dafür geht deine ID beim Verschicken an
+        <strong>Discord</strong> – anders kann dich dort niemand erreichen. Ohne ID geht gar
+        nichts an Discord; du bestellst dann genauso, fragst aber selbst nach. Löschen kannst
+        du sie jederzeit im selben Feld, indem du es leer machst und speicherst.</p>
+
+        <p><strong>Wer von deiner Anmeldung erfährt.</strong> Sobald du ein Konto anlegst,
+        bekommen die Veranstalter der AgeLan darüber eine Nachricht im Discord – mit deinem
+        Namen und dem Vermerk, ob du eine Discord-ID hinterlegt hast (die ID selbst steht nicht
+        darin), dazu die Zahl der Konten insgesamt. Das ist nötig, damit sie
+        dich freischalten und dir bei Fragen antworten können. Weiter als bis zu den
+        Veranstaltern geht die Nachricht nicht.</p>
+
+        <p><strong>Wo es liegt:</strong> Anmeldedaten und Discord-ID bei Cloudflare, alles Übrige in der
+        Echtzeit-Datenbank von Google (Firebase). Das Rechenzentrum steht in
+        <strong>Belgien</strong> und wird von Google betrieben. <strong>Wenn du das nicht
+        möchtest, melde dich mit einem Spitznamen statt deines echten Namens an.</strong></p>
+
+        <p><strong>Wie lange:</strong> bis zum Ende der Veranstaltung. Danach werden die
+        Konten gelöscht; für die nächste AgeLan legt jede:r ein neues an.</p>
+
+        <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung,
+        Datenübertragbarkeit und Widerspruch. Ein Wort im Discord genügt. Beschweren kannst
+        du dich beim Thüringer Landesbeauftragten für den Datenschutz und die
+        Informationsfreiheit.</p>
+
+        <p><strong>Was „Konto löschen“ wirklich macht:</strong> Es entfernt deine Anmeldedaten
+        und deine Discord-ID bei Cloudflare – mehr nicht. <strong>Deine Bestellungen bleiben
+        stehen, mit deinem Namen daran</strong>: Essensbestellungen samt Sonderwunsch,
+        Frühstücksbestellungen, deine Turnier-Anmeldung und deine Zeiten im Streamplan liegen
+        in der Firebase-Datenbank und hängen nicht am Konto. Wenn du auch die weghaben
+        willst, sag es dem Veranstalter: nur er kann sie löschen, und er macht es auf
+        Zuruf. Spätestens am Ende der Veranstaltung räumt er die Pläne ohnehin komplett ab.</p>
+
+        <p>Wer die Adresse der Datenbank kennt, kann die eingetragenen Daten technisch
+        auch ohne Anmeldung lesen. Trag hier also nichts ein, was nicht auch auf einem
+        Aushang stehen dürfte.</p>
+      </div>
+    </details>
+
+    <!-- Hier stand bis 2026-09-03 „Zum Öffnen brauchst du das Passwort".
+         Überholt: es gibt kein gemeinsames Passwort mehr, jede:r legt sich ein
+         eigenes Konto an. Was dafür nötig ist, sagt die Anmeldemaske selbst –
+         zweimal dasselbe an zwei Orten läuft nur auseinander. -->
+  </div>
+</div>
+
+<!-- Passwortabfrage: liegt über dem Vorraum und öffnet sich erst auf Klick.
+     Die App-Skripte werden bewusst NICHT im <head> eingebunden, sondern unten
+     von hier nachgeladen – sonst stünde die Firebase-Verbindung schon, während
+     das Overlay nur optisch davorliegt. -->
+<div id="pw-gate" class="pw-overlay" hidden>
+  <div class="pw-box">
+    <div class="pw-icon">🔒</div>
+    <h2 class="pw-titel" id="pw-gate-titel">AgeLan öffnen</h2>
+
+    <!-- Zwei Wege: anmelden (der Normalfall) und einmalig ein Konto anlegen.
+         Umgeschaltet über die Klasse .modus-neu am Kasten – so bleibt es EIN
+         Dialog mit EINEM Absende-Weg statt zweier, die auseinanderlaufen. -->
+    <p class="pw-text" id="pw-text-login">Melde dich mit deinem <b>AGE-LAN-Konto</b> an – derselbe Nickname und dasselbe Passwort wie auf der Website. Freigeschaltet wirst du beim Check-in auf der LAN.</p>
+    <p class="pw-text pw-nur-neu" id="pw-text-neu">Einmalig ein Konto anlegen. Dafür brauchst du das Passwort der Veranstaltung – du bekommst es von Michel im <b>Discord</b>.</p>
+
+    <label class="pw-label pw-nur-neu" for="pw-lan">Passwort der Veranstaltung</label>
+    <input id="pw-lan" type="password" autocomplete="off" placeholder="Von Michel im Discord" class="pw-eingabe pw-nur-neu" />
+
+    <label class="pw-label" for="pw-nick">Dein Name</label>
+    <input id="pw-nick" type="text" autocomplete="username" placeholder="z. B. Tecko" maxlength="20" class="pw-eingabe" />
+
+    <label class="pw-label" for="pw-gate-input">Dein Passwort</label>
+    <input id="pw-gate-input" type="password" autocomplete="current-password" placeholder="Mindestens 4 Zeichen" class="pw-eingabe" />
+
+    <!-- Nur für Michel: wer hier das Veranstalter-Passwort mitgibt, ist auf
+         jedem Gerät Veranstalter, sobald er sich anmeldet – ohne PIN. -->
+    <label class="pw-label pw-nur-neu" for="pw-veranstalter">Veranstalter-Passwort <span class="pw-freiwillig">(nur für den Veranstalter)</span></label>
+    <input id="pw-veranstalter" type="password" autocomplete="off" placeholder="Leer lassen, wenn du Teilnehmer bist" class="pw-eingabe pw-nur-neu" />
+
+    <button id="pw-gate-btn" type="button" class="pw-knopf">Anmelden</button>
+    <button id="pw-wechsel" type="button" class="pw-zurueck">Noch kein Konto? Auf der AGE-LAN-Website anlegen ↗</button>
+    <button id="pw-gate-zurueck" type="button" class="pw-zurueck">← Zurück zur Übersicht</button>
+    <p id="pw-gate-msg" class="pw-meldung" role="alert"></p>
+  </div>
+</div>
+
+<!-- ============ Mein Konto ============ -->
+<!-- ⚠️ Der Reiter „Einstellungen" ist NUR fuer Veranstalter. Ohne diesen Dialog
+     gaebe es fuer alle anderen ueberhaupt keinen Weg, etwas am eigenen Konto zu
+     aendern - die Discord-ID waere nur beim Anlegen eintragbar und danach nie
+     wieder. Erreichbar ueber den eigenen Namen in der Kopfzeile. -->
+<div id="konto-gate" class="pw-overlay" hidden>
+  <div class="pw-box konto-box">
+    <div class="pw-icon">👤</div>
+    <h2 class="pw-titel">Mein Konto</h2>
+    <p class="pw-text" id="konto-wer"></p>
+
+    <!-- Nur sichtbar, wenn dieser Dialog NACH der Anmeldung von selbst aufgeht,
+         weil noch keine Discord-ID hinterlegt ist. Er erklärt, warum er da ist –
+         ein Dialog, der ungefragt aufspringt und nichts sagt, wird weggeklickt. -->
+    <p class="konto-erinnerung" id="konto-erinnerung" hidden>
+      <b>Noch ein Schritt:</b> Trag hier deine Discord-ID ein – ohne sie sagt dir
+      niemand Bescheid, wenn dein Essen bereitliegt. Geht auch später: über
+      deinen Namen oben rechts.
+    </p>
+
+    <label class="pw-label" for="konto-discord">Deine Discord-ID <span class="pw-freiwillig">(freiwillig)</span></label>
+    <!-- inputmode="numeric" holt am Handy die Zifferntastatur.
+         ⚠️ Bewusst KEIN type="number": das machte aus der 18-stelligen Zahl
+         eine Fliesskommazahl und schnitte hinten Stellen ab. -->
+    <input id="konto-discord" type="text" inputmode="numeric" autocomplete="off"
+           placeholder="z. B. 247882849853407232" maxlength="20" class="pw-eingabe">
+    <p class="konto-hinweis">Damit sagt dir der AgeLan-Bot per Direktnachricht Bescheid, sobald dein Essen zum Abholen bereitliegt. Ohne ID bekommst du keine Nachricht und musst selbst nachfragen.</p>
+
+    <details class="konto-hilfe">
+      <summary>Wo finde ich die?</summary>
+      <div class="konto-hilfe-text">
+        <p><b>Das ist nicht dein Discord-Name</b>, sondern eine lange Zahl.</p>
+        <ol>
+          <li>Discord öffnen, unten links auf das <b>Zahnrad</b> (Einstellungen)</li>
+          <li>In der Liste weiter unten <b>Erweitert</b> antippen</li>
+          <li><b>Entwicklermodus</b> einschalten</li>
+          <li>Zurück zum Chat, dann <b>Rechtsklick auf dich selbst</b> – am Handy lange antippen</li>
+          <li><b>„Benutzer-ID kopieren"</b> wählen und hier einfügen</li>
+        </ol>
+      </div>
+    </details>
+
+    <button id="konto-btn-speichern" type="button" class="pw-knopf">Speichern</button>
+
+    <!-- ⚠️ Der wichtigste Knopf in diesem Dialog. Eine falsche, aber gueltig
+         aussehende Zahl geht an eine wildfremde Person oder ins Leere - ohne
+         dass es irgendwer merkt. Erst die Testnachricht macht aus dem stillen
+         Fehler einen sichtbaren. Deshalb steht er hier offen und nicht
+         irgendwo versteckt. -->
+    <button id="konto-btn-test" type="button" class="pw-knopf konto-knopf-test" hidden>Testnachricht schicken</button>
+    <p class="konto-hinweis" id="konto-test-hinweis" hidden>Kommt nichts an, stimmt entweder die ID nicht – oder du hast in Discord die Direktnachrichten von Servermitgliedern ausgeschaltet.</p>
+
+    <p id="konto-msg" class="pw-meldung" role="status"></p>
+    <button id="konto-zurueck" type="button" class="pw-zurueck">Schließen</button>
+  </div>
+</div>
+
+<!-- ============ QR zum Scannen ============ -->
+<!-- ⚠️ Der QR-Bereich ist FEST hell, auch im Dunkelmodus. Ein dunkler QR auf
+     dunklem Grund ist für jede Handy-Kamera unlesbar - das fällt beim Bauen nicht
+     auf, weil man selten im Dunkelmodus testet, und auf der LAN dann sofort. -->
+<div id="qr-gate" class="pw-overlay" hidden>
+  <div class="pw-box qr-box">
+    <h2 class="pw-titel">Seite zum Scannen</h2>
+    <p class="pw-text">Handy-Kamera drauf halten – dann geht die AgeLan auf.</p>
+    <div class="qr-flaeche" id="qr-flaeche"></div>
+    <!-- Die Adresse steht darunter im Klartext: geht der QR nicht (schlechtes
+         Licht, alte Kamera, Bibliothek nicht geladen), tippt man sie eben ab. -->
+    <p class="qr-adresse" id="qr-adresse"></p>
+    <button id="qr-zurueck" type="button" class="pw-zurueck">Schließen</button>
+  </div>
+</div>
+
+<header class="kopfzeile">
+  <div class="kopfzeile-left">
+    <!-- Führt zurück aufs Dashboard mit den Kacheln. Als <button>, nicht als
+         <span>: der Weg muss auch mit Tastatur erreichbar sein. -->
+    <!-- Nur das Wappen, nicht das ganze Banner: bei 26 px Höhe wäre der
+         Schriftzug „AGE LAN #3" unlesbar, das Wappen bleibt erkennbar. -->
+    <button type="button" class="kopfzeile-titel" id="kopf-titel" title="Zur Übersicht">
+      <img class="kopf-wappen" src="wappen.jpg?v=1.0" alt="" width="26" height="26"> AgeLan
+    </button>
+  </div>
+  <div class="kopfzeile-right">
+    <!-- Wer ist hier angemeldet? Bleibt leer, solange es kein Konto gibt.
+         ⚠️ Kein Vereinslogo: die AgeLan ist Michels privates Event, das Wappen
+         des Vereins hat hier nichts zu suchen. -->
+    <!-- Als <button>, nicht als <span>: das ist fuer alle ausser dem
+         Veranstalter der EINZIGE Weg zum eigenen Konto, und der muss auch mit
+         Tastatur erreichbar sein - genau wie der Titel links daneben. -->
+    <button type="button" class="kopfzeile-konto" id="kopf-konto" hidden></button>
+    <!-- ⚠️ Bleibt im Normalbetrieb LEER (Michel: das „live" kann raus). Es
+         fuellt sich nur im Test-Modus mit „lokal (Test)" – ohne diese Warnung
+         sieht eine Sitzung gegen die Mock-Datenbank aus wie die echte. -->
+    <span class="kopfzeile-status" id="sync-status" role="status" hidden></span>
+    <button class="btn-abbrechen" id="btn-admin-oeffnen" title="Veranstalter">⚙️</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <!-- ⚠️ Steht VOR dem Turnier: das Dashboard ist die Startseite der
+       Veranstaltung, nicht eine Ansicht unter anderen. -->
+  <button data-tab="uebersicht">Übersicht</button>
+  <button data-tab="turnier" class="active" aria-current="page">Turnier</button>
+  <button data-tab="stream">Stream</button>
+  <button data-tab="fruehstueck">Frühstück</button>
+  <button data-tab="essen">Essen</button>
+  <button data-tab="downloads">Downloads</button>
+  <!-- Nur fuer Veranstalter. Versteckt per hidden, eingeblendet in app.js,
+       sobald das Konto das Merkmal traegt. -->
+  <button data-tab="einstellungen" id="nav-einstellungen" hidden>Einstellungen</button>
+  <!-- Zum Herumzeigen auf der LAN: der QR führt auf genau diese Seite.
+       ⚠️ Bewusst für ALLE sichtbar, nicht nur für Veranstalter - jede:r soll
+       einem Kumpel die Seite zeigen können, und geheim ist die Adresse nicht.
+       Kein data-tab: der Knopf wechselt keinen Reiter, er öffnet einen Dialog. -->
+  <button type="button" id="nav-qr" title="QR-Code zum Scannen zeigen" aria-label="QR-Code zeigen">
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h3v3h-3v-3zm5 0h3v3h-3v-3zm-5 5h3v3h-3v-3zm5 0h3v3h-3v-3z"/></svg>
+  </button>
+</nav>
+
+<main id="app">
+
+ <!-- =================== ÜBERSICHT / DASHBOARD =================== -->
+ <div class="tab-section" id="tab-uebersicht">
+  <div class="ub-kopf">
+    <h1 class="ub-titel" id="ub-titel">Übersicht</h1>
+    <p class="ub-untertitel" id="ub-untertitel"></p>
+  </div>
+  <!-- Die Kacheln entstehen in uebersicht-app.js. Ein leeres Ziel hier, damit
+       ein Renderfehler nicht die ganze Seite zerlegt. -->
+  <div id="ub-kacheln"></div>
+ </div>
+
+ <div class="tab-section active" id="tab-turnier">
+
+  <!-- Rückweg aus einem geöffneten Turnier in die Turnierliste -->
+  <div class="turnier-leiste" id="turnier-leiste" style="display:none">
+    <button class="btn btn-link" id="btn-turnier-wechseln">← Alle Turniere</button>
+    <span class="turnier-leiste-name" id="turnier-leiste-name"></span>
+  </div>
+
+  <!-- ============ AUSWAHL (mehrere Turniere nebeneinander) ============ -->
+  <section class="screen active" id="screen-auswahl">
+    <div class="screen-inhalt zentriert">
+      <h1 class="logo">🏆 AgeLan</h1>
+      <p class="untertitel">Turniere</p>
+
+      <div id="auswahl-liste"></div>
+      <p class="hinweis-text" id="auswahl-leer" style="display:none">Aktuell läuft kein Turnier.</p>
+      <p class="hinweis-text fehler" id="auswahl-fehler"></p>
+
+      <!-- Turniere anlegen darf, wessen KONTO als Veranstalter gekennzeichnet ist.
+           ⚠️ Der Passwort-Weg darunter ist nur noch der Notausgang und bewusst
+           zugeklappt: waere er ersatzlos weg, kaeme jemand ohne
+           Veranstalter-Konto (etwa nach „alle Konten loeschen") an das Anlegen
+           gar nicht mehr heran. Michel sieht ihn nie – bei ihm greift das Konto. -->
+      <div class="karte-block" id="veranstalter-gate">
+        <h2>🔒 Turnier anlegen</h2>
+        <p class="hinweis-text">Turniere legt der Veranstalter an. Melde dich mit deinem Veranstalter-Konto an, dann erscheint hier das Formular.</p>
+        <details class="notausgang">
+          <summary>Kein Veranstalter-Konto? Mit Passwort öffnen</summary>
+          <input type="password" id="veranstalter-pw" aria-label="Veranstalter-Passwort" class="eingabe" placeholder="Veranstalter-Passwort" autocomplete="current-password">
+          <button class="btn btn-secondary btn-grow" id="btn-veranstalter-oeffnen">Öffnen</button>
+          <p class="hinweis-text fehler" id="veranstalter-fehler"></p>
+        </details>
+      </div>
+
+      <div class="karte-block" id="anlegen-block" style="display:none">
+        <h2>Turnier anlegen</h2>
+        <p class="hinweis-text">Mehrere Turniere laufen nebeneinander – ein zweites Turnier verdrängt das erste nicht.</p>
+        <label class="feld-label" for="neu-name">Turniername</label>
+        <input type="text" id="neu-name" class="eingabe" placeholder="z. B. AgeLan 2026 – 2vs2" maxlength="40" autocomplete="off">
+
+        <label class="feld-label" for="neu-pin">Admin-PIN (für dich als Veranstalter)</label>
+        <input type="text" id="neu-pin" class="eingabe" placeholder="mindestens 6 Zeichen" minlength="6" maxlength="20" autocomplete="off">
+
+        <button class="btn btn-primary btn-grow" id="btn-turnier-erstellen">Turnier starten</button>
+        <p class="hinweis-text">Erst die Anmeldung, dann das Format: Turnierform und Ablauf wählst du später in der
+          Lobby – dann siehst du, wie viele da sind, und die App rechnet dir jedes Format vor.</p>
+        <p class="hinweis-text fehler" id="neu-fehler"></p>
+        <button class="btn btn-link" id="btn-veranstalter-sperren" hidden>Veranstalter-Zugang auf diesem Gerät beenden</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Meldet fehlgeschlagene Schreibvorgänge. Liegt außerhalb der Screens,
+       damit er in jeder Phase erscheinen kann. -->
+  <div id="netz-fehler" role="alert" aria-live="assertive"></div>
+
+  <!-- ============ START ============ -->
+  <section class="screen" id="screen-start">
+    <div class="screen-inhalt zentriert">
+
+      <!-- Turnier läuft, Anmeldung offen -> mitmachen -->
+      <div id="start-turnier-laeuft">
+        <h1 class="logo" id="start-turniername">🏆</h1>
+        <p class="untertitel" id="start-phase-text">Anmeldung läuft</p>
+        <p class="spieler-zaehler" id="start-zaehler"></p>
+        <div class="aktion-block">
+          <button class="btn btn-primary btn-grow" id="btn-mitmachen">Jetzt anmelden</button>
+          <button class="btn btn-link" id="btn-nur-zuschauen">Nur zuschauen</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LOGIN (Name + Rating) ============ -->
+  <section class="screen" id="screen-login">
+    <div class="screen-inhalt zentriert">
+      <h2>Anmeldung</h2>
+      <p class="untertitel">Trage deinen Namen und dein 1vs1-Elo ein.</p>
+      <label class="feld-label" for="login-name">Name</label>
+      <input type="text" id="login-name" class="eingabe" placeholder="Dein Name" maxlength="24" autocomplete="off">
+
+      <!-- ⚠️ Gemeint ist immer das 1vs1-Elo, auch wenn das Turnier 2vs2 ist. Steht das
+           nicht dran, tragen die Leute bei einem 2vs2-Turnier ihr Team-Elo ein – und die
+           App verteilt die Teams nach zwei verschiedenen Maßstäben. Der Satz steht
+           deshalb an beiden Eingabestellen (hier und in der Lobby), nicht nur hier. -->
+      <label class="feld-label" for="login-rating">1vs1-Elo (500–3000)</label>
+      <div class="rating-zeile">
+        <input type="range" id="login-rating-slider" min="500" max="3000" step="10" value="1500"
+               aria-label="1vs1-Elo als Regler (500 bis 3000)">
+        <input type="number" id="login-rating" class="eingabe rating-zahl" min="500" max="3000" step="10" value="1500"
+               aria-label="1vs1-Elo als Zahl (500 bis 3000)">
+      </div>
+      <p class="feld-hinweis">Trag dein <strong>1vs1-Elo</strong> ein — auch bei einem 2vs2-Turnier, nicht das Team-Elo.</p>
+
+      <button class="btn btn-primary btn-grow" id="btn-login-bestaetigen">Anmelden</button>
+      <p class="hinweis-text" id="login-fehler"></p>
+      <button class="btn btn-link" id="btn-login-zurueck">Zurück</button>
+    </div>
+  </section>
+
+  <!-- ============ LOBBY (Anmeldung läuft) ============ -->
+  <section class="screen" id="screen-lobby">
+    <div class="screen-inhalt">
+      <h2 id="lobby-titel">Anmeldung</h2>
+      <p class="spieler-zaehler" id="lobby-zaehler">0 Angemeldete</p>
+      <ul class="spieler-liste" id="lobby-spielerliste"></ul>
+      <p class="hinweis-text fehler" id="lobby-fehler" role="alert"></p>
+
+      <div id="lobby-eigen" class="karte-block" style="display:none">
+        <p class="feld-label">Dein 1vs1-Elo anpassen</p>
+        <p class="feld-hinweis">Steht ein falscher Wert drin, kannst du ihn hier jederzeit richtigstellen. Gemeint ist dein <strong>1vs1-Elo</strong>, nicht das Team-Elo.</p>
+        <div class="rating-zeile">
+          <input type="range" id="lobby-rating-slider" min="500" max="3000" step="10" value="1500"
+                 aria-label="Dein 1vs1-Elo als Regler (500 bis 3000)">
+          <input type="number" id="lobby-rating" class="eingabe rating-zahl" min="500" max="3000" step="10" value="1500"
+                 aria-label="Dein 1vs1-Elo als Zahl (500 bis 3000)">
+        </div>
+        <button class="btn btn-secondary btn-grow" id="btn-lobby-rating-speichern">Speichern</button>
+        <p class="hinweis-text" id="lobby-rating-hinweis"></p>
+      </div>
+
+      <button class="btn btn-secondary btn-grow" id="btn-lobby-selbst-anmelden" style="display:none">＋ Selbst mitspielen</button>
+
+      <div id="lobby-admin" style="display:none">
+        <div class="karte-block" id="format-block">
+          <p class="feld-label">Turnierformat festlegen</p>
+          <p class="hinweis-text" id="format-stand"></p>
+
+          <label class="feld-label" for="form-teamgroesse">Wer spielt zusammen?</label>
+          <select id="form-teamgroesse" class="eingabe">
+            <option value="2">2 gegen 2 — die App bildet ratingfaire Paare</option>
+            <option value="1">1 gegen 1 — jede:r spielt für sich</option>
+            <option value="3">3 gegen 3</option>
+            <option value="4">4 gegen 4</option>
+          </select>
+          <p class="hinweis-text" id="format-teams-zeile"></p>
+
+          <label class="feld-label" for="form-kotyp">K.-o.-Runden</label>
+          <select id="form-kotyp" class="eingabe">
+            <option value="einfach">Einfach — wer verliert, ist raus</option>
+            <option value="doppel">Doppel — erst nach der zweiten Niederlage raus</option>
+          </select>
+          <p class="hinweis-text">Nur für Abläufe mit K.-o. – beim Auslosen noch einmal änderbar.</p>
+
+          <p class="feld-label" id="format-vorschau-titel">Ablauf wählen</p>
+          <div class="format-liste" id="format-liste"></div>
+
+          <button class="btn btn-primary btn-grow" id="btn-form-speichern">Format festlegen</button>
+          <p class="hinweis-text">Änderbar, solange die Anmeldung läuft. Danach hängen Teams und Spiele daran.</p>
+          <p class="hinweis-text fehler" id="form-fehler"></p>
+        </div>
+
+        <button class="btn btn-primary btn-grow" id="btn-teams-bilden">Teams bilden →</button>
+        <p class="hinweis-text" id="lobby-teams-hinweis">Als Veranstalter: bildet ratingfaire 2er-Teams.</p>
+
+        <div class="karte-block">
+          <p class="feld-label">🧪 Zum Ausprobieren</p>
+          <div class="feld-zeile">
+            <input type="number" id="test-anzahl" aria-label="Anzahl Testspieler" class="eingabe" min="1" max="64" value="8" style="flex:0 0 90px">
+            <button class="btn btn-secondary" id="btn-test-spieler" style="flex:1">Testspieler anlegen</button>
+          </div>
+          <p class="hinweis-text">Erfindet Spieler mit zufälligem Rating, damit du den Ablauf allein durchspielen kannst.</p>
+          <button class="btn btn-link" id="btn-test-entfernen">Testspieler wieder entfernen</button>
+          <p class="hinweis-text fehler" id="test-fehler"></p>
+        </div>
+      </div>
+      <p class="hinweis-text" id="lobby-warte" style="display:none">Warte, bis der Veranstalter die Teams bildet …</p>
+    </div>
+  </section>
+
+  <!-- ============ TEAMS ============ -->
+  <section class="screen" id="screen-teams">
+    <div class="screen-inhalt">
+      <h2 id="teams-titel">Teams</h2>
+      <div class="team-liste" id="teams-liste"></div>
+
+      <!-- ⚠️ Derselbe Kasten wie in der Lobby, nur eine Phase spaeter. Nach dem
+           Team-Bilden sieht niemand mehr die Lobby – ohne diesen Block waere das
+           Elo ab hier eingefroren, obwohl der Veranstalter die Teams noch neu
+           bilden kann. Aendert sich einer der beiden Kaesten, gehoert der andere
+           mitgezogen; die Regel dazu steht in aktualisiereRating(). -->
+      <div id="teams-eigen" class="karte-block" style="display:none">
+        <p class="feld-label">Dein 1vs1-Elo anpassen</p>
+        <p class="feld-hinweis">Stimmt dein Wert nicht, stell ihn hier richtig. Gemeint ist dein <strong>1vs1-Elo</strong>, nicht das Team-Elo. Die Mannschaften sind schon gebildet — damit sich die Korrektur auswirkt, muss der Veranstalter sie noch einmal neu vorschlagen lassen.</p>
+        <div class="rating-zeile">
+          <input type="range" id="teams-rating-slider" min="500" max="3000" step="10" value="1500"
+                 aria-label="Dein 1vs1-Elo als Regler (500 bis 3000)">
+          <input type="number" id="teams-rating" class="eingabe rating-zahl" min="500" max="3000" step="10" value="1500"
+                 aria-label="Dein 1vs1-Elo als Zahl (500 bis 3000)">
+        </div>
+        <button class="btn btn-secondary btn-grow" id="btn-teams-rating-speichern">Speichern</button>
+        <p class="hinweis-text" id="teams-rating-hinweis"></p>
+      </div>
+
+      <div id="teams-admin" style="display:none">
+        <div class="karte-block" id="setzliste-block">
+          <p class="feld-label">Setzliste</p>
+          <p class="hinweis-text">Bestimmt, wer beim Auslosen als stark gilt. Ohne Änderung zählt das Rating.</p>
+          <ol class="setzliste" id="setzliste"></ol>
+          <button class="btn btn-link" id="btn-setzliste-reset">Zurück auf die Rating-Reihenfolge</button>
+          <p class="hinweis-text fehler" id="setzliste-fehler"></p>
+        </div>
+
+        <div id="teams-tausch-block">
+          <div class="karte-block">
+            <p class="feld-label">Zwei Spieler tauschen</p>
+            <div class="feld-zeile">
+              <select id="tausch-a" aria-label="Erster Spieler zum Tauschen" class="eingabe"></select>
+              <select id="tausch-b" aria-label="Zweiter Spieler zum Tauschen" class="eingabe"></select>
+            </div>
+            <button class="btn btn-secondary btn-grow" id="btn-tauschen">Tauschen</button>
+          </div>
+          <button class="btn btn-secondary btn-grow" id="btn-teams-neu">🎲 Neu vorschlagen</button>
+        </div>
+
+        <div class="karte-block">
+          <p class="feld-label">Turnier auslosen <span class="los-teamzahl" id="los-teamzahl"></span></p>
+          <p class="hinweis-text" id="los-ablauf-hinweis"></p>
+
+          <label class="feld-label" for="los-bestof">Modus je Spiel</label>
+          <select id="los-bestof" class="eingabe">
+            <option value="3">Best of 3 (erst 2 Sätze gewinnen)</option>
+            <option value="5">Best of 5 (erst 3 Sätze gewinnen)</option>
+            <option value="7">Best of 7 (erst 4 Sätze gewinnen)</option>
+          </select>
+
+          <div id="los-kotyp-feld">
+            <label class="feld-label" for="los-kotyp">K.-o.-Runde</label>
+            <select id="los-kotyp" class="eingabe">
+              <option value="einfach">Einfach — wer verliert, ist raus</option>
+              <option value="doppel">Doppel — erst nach der zweiten Niederlage raus</option>
+            </select>
+            <p class="hinweis-text" id="los-kotyp-hinweis"></p>
+          </div>
+
+          <div id="los-finalfeld">
+            <label class="feld-label" for="los-bestof-finale">Finale</label>
+            <select id="los-bestof-finale" class="eingabe">
+              <option value="">wie die anderen Spiele</option>
+              <option value="3">Best of 3</option>
+              <option value="5">Best of 5</option>
+              <option value="7">Best of 7</option>
+            </select>
+          </div>
+
+          <div class="feld-zeile" id="los-gruppenfelder">
+            <div>
+              <label class="feld-label" for="los-gruppen">Gruppen</label>
+              <input type="number" id="los-gruppen" class="eingabe" min="1" value="2">
+            </div>
+            <div>
+              <label class="feld-label" for="los-weiter">Weiter je Gruppe</label>
+              <input type="number" id="los-weiter" class="eingabe" min="1" value="2">
+            </div>
+          </div>
+          <p class="hinweis-text" id="los-vorschau"></p>
+
+          <div class="feld-zeile" id="los-schweizerfelder" style="display:none">
+            <div>
+              <label class="feld-label" for="los-runden">Runden</label>
+              <input type="number" id="los-runden" class="eingabe" min="1" value="4">
+            </div>
+            <div id="los-weiter-gesamt-feld">
+              <label class="feld-label" for="los-weiter-gesamt">Weiter in die K.-o.-Runde</label>
+              <input type="number" id="los-weiter-gesamt" class="eingabe" min="2" value="4">
+            </div>
+          </div>
+          <p class="hinweis-text" id="los-schweizer-hinweis" style="display:none"></p>
+
+          <div class="feld-zeile" id="los-wertungfelder">
+            <div>
+              <label class="feld-label" for="los-punkte">Punkte je Sieg</label>
+              <input type="number" id="los-punkte" class="eingabe" min="1" max="5" value="3">
+            </div>
+            <div>
+              <label class="feld-label" for="los-tiebreak">Bei Punktgleichstand</label>
+              <select id="los-tiebreak" class="eingabe">
+                <option value="satzdifferenz">Satzdifferenz</option>
+                <option value="direktes_duell">Direktes Duell</option>
+                <option value="buchholz">Buchholz (Stärke der Gegner)</option>
+                <option value="buchholz_cut1">Buchholz gestrichen (ohne den schwächsten Gegner)</option>
+                <option value="sonneborn">Sonneborn-Berger (nur besiegte Gegner)</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="radio-zeile" id="los-doppelrunde-zeile">
+            <input type="checkbox" id="los-doppelrunde">
+            <span><strong>Hin- und Rückrunde</strong> — jede Paarung zweimal, mit getauschten Seiten</span>
+          </label>
+          <label class="radio-zeile" id="los-spieltage-zeile">
+            <input type="checkbox" id="los-spieltage">
+            <span><strong>Ligamodus mit Spieltagen</strong> — die Spiele werden auf Spieltage verteilt, je Spieltag höchstens ein Spiel pro Team. Datum je Spieltag lässt sich danach eintragen.</span>
+          </label>
+          <label class="radio-zeile" id="los-bracketreset-zeile">
+            <input type="checkbox" id="los-bracketreset">
+            <span><strong>Entscheidungsspiel im großen Finale</strong> — gewinnt der aus dem Verliererbaum, gibt es ein zweites Spiel. Sonst wäre er mit einer Niederlage Sieger.</span>
+          </label>
+          <label class="radio-zeile" id="los-platz3-zeile">
+            <input type="checkbox" id="los-platz3">
+            <span><strong>Spiel um Platz 3</strong> — die beiden Halbfinal-Verlierer spielen den dritten Platz aus</span>
+          </label>
+
+          <div id="los-art-block">
+            <p class="feld-label">Auslosungs-Art</p>
+            <label class="radio-zeile">
+              <input type="radio" name="losmodus" value="setzliste" checked>
+              <span><strong>Nach Setzliste</strong> <span id="losmodus-setzliste-text">— starke Teams auf die Gruppen verteilt (fairere Gruppen)</span></span>
+            </label>
+            <label class="radio-zeile">
+              <input type="radio" name="losmodus" value="zufaellig">
+              <span><strong>Rein zufällig</strong> — reines Losglück</span>
+            </label>
+          </div>
+          <button class="btn btn-primary btn-grow" id="btn-gruppen-losen">Auslosen →</button>
+        </div>
+        <p class="hinweis-text" id="teams-fehler"></p>
+      </div>
+      <p class="hinweis-text" id="teams-warte" style="display:none">Warte, bis der Veranstalter die Gruppen auslost …</p>
+    </div>
+  </section>
+
+  <!-- ============ GRUPPEN ============ -->
+  <section class="screen" id="screen-gruppen">
+    <div class="screen-inhalt">
+      <h2 id="gruppen-titel">Gruppenphase</h2>
+      <div id="gruppen-container"></div>
+
+      <div class="karte-block" id="spieltag-daten" style="display:none">
+        <p class="feld-label">Datum je Spieltag</p>
+        <p class="hinweis-text">Optional. Steht ein Datum, taucht es über dem Spieltag auf – so sieht jede:r, wann gespielt wird.</p>
+        <div id="spieltag-datum-liste"></div>
+        <p class="hinweis-text fehler" id="spieltag-fehler"></p>
+      </div>
+
+      <div id="gruppen-admin" style="display:none">
+        <button class="btn btn-secondary btn-grow" id="btn-zeitplan-gruppen">🕐 Zeitplan – Spiele terminieren</button>
+        <button class="btn btn-primary btn-grow" id="btn-ko-losen">K.o.-Auslosung starten →</button>
+        <p class="hinweis-text" id="gruppen-admin-hinweis"></p>
+        <button class="btn btn-secondary btn-grow" id="btn-sim-gruppen">🧪 Offene Spiele auswürfeln</button>
+        <p class="hinweis-text fehler" id="sim-gruppen-fehler"></p>
+      </div>
+      <p class="hinweis-text" id="gruppen-warte" style="display:none"></p>
+    </div>
+  </section>
+
+  <!-- ============ K.O. ============ -->
+  <section class="screen" id="screen-ko">
+    <div class="screen-inhalt">
+      <h2>K.-o.-Runde</h2>
+      <div id="ko-container" class="bracket"></div>
+      <div id="ko-admin" style="display:none">
+        <button class="btn btn-secondary btn-grow" id="btn-zeitplan-ko">🕐 Zeitplan – Spiele terminieren</button>
+        <button class="btn btn-secondary btn-grow" id="btn-sim-ko">🧪 Offene Spiele auswürfeln</button>
+        <p class="hinweis-text fehler" id="sim-ko-fehler"></p>
+        <button class="btn btn-link" id="btn-ko-naechste">Nächste Runde manuell prüfen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BEENDET ============ -->
+  <section class="screen" id="screen-beendet">
+    <div class="screen-inhalt zentriert">
+      <h1 class="sieger-titel">🏆 Turnier beendet!</h1>
+      <p class="sieger-name" id="beendet-sieger">—</p>
+      <div id="beendet-tabelle"></div>
+      <div id="beendet-bracket" class="bracket"></div>
+    </div>
+  </section>
+
+ </div>
+
+ <!-- ============ STREAMKALENDER ============ -->
+ <div class="tab-section" id="tab-stream">
+
+  <!-- noch kein Plan -> anlegen -->
+  <div class="sk-view aktiv" id="sk-kein-plan">
+    <div class="karte-block">
+      <h2>Streamplan anlegen</h2>
+      <p class="hinweis-text">Wer sendet wann vom Kanal? Jede:r mit dem Link trägt sich selbst ein. Mehrere dürfen sich dieselbe Zeit vormerken – der Plan ist erstmal eine Planung.</p>
+
+      <label class="feld-label" for="sk-neu-titel">Name des Plans</label>
+      <input type="text" id="sk-neu-titel" class="eingabe" placeholder="z. B. AgeLan 2026 – Streams" maxlength="60" autocomplete="off">
+
+      <div class="feld-zeile">
+        <div>
+          <label class="feld-label" for="sk-neu-start">Erster Tag</label>
+          <input type="date" id="sk-neu-start" class="eingabe">
+        </div>
+        <div>
+          <label class="feld-label" for="sk-neu-tage">Tage</label>
+          <input type="number" id="sk-neu-tage" class="eingabe" min="1" max="7" value="4">
+        </div>
+      </div>
+
+      <div class="feld-zeile">
+        <div>
+          <label class="feld-label" for="sk-neu-von">Sendebeginn je Tag</label>
+          <select id="sk-neu-von" class="eingabe"></select>
+        </div>
+        <div>
+          <label class="feld-label" for="sk-neu-bis">Sendeschluss</label>
+          <select id="sk-neu-bis" class="eingabe"></select>
+        </div>
+      </div>
+      <p class="hinweis-text">Zeiten nach Mitternacht sind mit „(Nacht)“ gekennzeichnet und gehören noch zum selben Tag. Einzelne Tage – etwa einen Sonntag, an dem nur vormittags etwas läuft – stellst du danach kürzer.</p>
+
+      <label class="feld-label" for="sk-neu-pin">Veranstalter-PIN</label>
+      <input type="text" id="sk-neu-pin" class="eingabe" placeholder="mindestens 6 Zeichen" minlength="6" maxlength="20" autocomplete="off">
+      <p class="hinweis-text" id="sk-neu-pin-hinweis"></p>
+
+      <button class="btn btn-primary btn-grow" id="sk-btn-erstellen">Streamplan anlegen</button>
+      <p class="hinweis-text fehler" id="sk-neu-fehler"></p>
+    </div>
+  </div>
+
+  <!-- Plan vorhanden -->
+  <div class="sk-view" id="sk-plan">
+    <div class="sk-kopf">
+      <h2 id="sk-titel">Streamplan</h2>
+      <p class="hinweis-text" id="sk-zeitraum"></p>
+    </div>
+
+    <button class="btn btn-primary btn-grow" id="sk-btn-belegen">＋ Zeit belegen</button>
+    <button class="btn btn-secondary btn-grow" id="sk-btn-programm" style="display:none">＋ Programmpunkt</button>
+
+    <div class="sk-tagchips" id="sk-tagchips"></div>
+    <div id="sk-kalender"></div>
+    <!-- ⚠️ Liegt am body-Ende, nicht im Kalender: der Kalender scrollt in sich
+         und wuerde den Tipp am eigenen Rand abschneiden. -->
+    <div id="sk-tipp" hidden></div>
+
+    <h3>Alle Einträge</h3>
+    <div id="sk-liste"></div>
+
+    <div class="karte-block" id="sk-admin-login">
+      <p class="feld-label">Veranstalter</p>
+      <p class="hinweis-text" id="sk-admin-konto-hinweis" hidden></p>
+      <div class="feld-zeile">
+        <div>
+          <input type="text" aria-label="Admin-PIN" id="sk-admin-pin" class="eingabe" placeholder="PIN" maxlength="20" autocomplete="off">
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="btn btn-secondary" id="sk-btn-admin-anmelden">Anmelden</button>
+        </div>
+      </div>
+      <p class="hinweis-text fehler" id="sk-admin-fehler"></p>
+    </div>
+
+    <div class="karte-block" id="sk-admin-panel" style="display:none">
+      <p class="feld-label">Zeitfenster je Tag</p>
+      <div id="sk-fenster-liste"></div>
+      <button class="btn btn-secondary btn-grow" id="sk-btn-fenster-speichern">Zeiten speichern</button>
+      <p class="hinweis-text">Nur innerhalb dieser Zeiten lässt sich etwas eintragen. Zwei Tage dürfen sich nicht überschneiden, und schon belegte Zeiten müssen im Fenster bleiben.</p>
+
+      <button class="btn btn-secondary btn-grow" id="sk-btn-leeren">Alle Einträge entfernen</button>
+      <p class="hinweis-text">Die Zeitfenster und der Plan bleiben stehen, nur die Belegungen fallen weg.</p>
+
+      <button class="btn btn-danger btn-grow" id="sk-btn-plan-loeschen">Streamplan löschen</button>
+      <p class="hinweis-text">Löscht den kompletten Plan. Das Turnier bleibt davon unberührt.</p>
+      <p class="hinweis-text fehler" id="sk-admin-panel-fehler"></p>
+    </div>
+  </div>
+
+ </div>
+
+ <div class="tab-section" id="tab-fruehstueck">
+
+  <!-- noch keine Bestellung -> anlegen -->
+  <div class="sk-view aktiv" id="fr-kein-plan">
+    <div class="karte-block">
+      <h2>Frühstücksbestellung anlegen</h2>
+      <p class="hinweis-text">Pakete zum Vorbestellen fürs Frühstück – jede:r bucht am Vorabend, was am nächsten Morgen bereitstehen soll.</p>
+
+      <label class="feld-label" for="fr-neu-titel">Name</label>
+      <input type="text" id="fr-neu-titel" class="eingabe" placeholder="z. B. AgeLan 2026 – Frühstück" maxlength="60" autocomplete="off">
+
+      <div class="feld-zeile">
+        <div>
+          <label class="feld-label" for="fr-neu-start">Erster Frühstücksmorgen</label>
+          <input type="date" id="fr-neu-start" class="eingabe">
+        </div>
+        <div>
+          <label class="feld-label" for="fr-neu-tage">Wie viele Tage?</label>
+          <input type="number" id="fr-neu-tage" class="eingabe" min="1" max="7" value="3">
+        </div>
+      </div>
+      <!-- Rechnet die Eingabe sofort in die echten Tage um. „3 Tage" ist sonst
+           nicht dasselbe wie „Fr, Sa, So" – und genau daran ist die Frage
+           entstanden, was das Feld überhaupt meint. -->
+      <p class="hinweis-text" id="fr-neu-vorschau"></p>
+
+      <label class="feld-label" for="fr-neu-schluss">Bestellschluss (am Vorabend)</label>
+      <input type="time" id="fr-neu-schluss" class="eingabe" value="20:00">
+      <p class="hinweis-text">Bestellungen für einen Morgen sind bis zu dieser Uhrzeit am Tag davor möglich – danach wird eingekauft.</p>
+
+      <label class="feld-label" for="fr-neu-pin">Veranstalter-PIN</label>
+      <input type="text" id="fr-neu-pin" class="eingabe" placeholder="mindestens 6 Zeichen" minlength="6" maxlength="20" autocomplete="off">
+      <p class="hinweis-text" id="fr-neu-pin-hinweis"></p>
+
+      <button class="btn btn-primary btn-grow" id="fr-btn-erstellen">Frühstücksbestellung anlegen</button>
+      <p class="hinweis-text fehler" id="fr-neu-fehler"></p>
+    </div>
+  </div>
+
+  <!-- Bestellung vorhanden -->
+  <div class="sk-view" id="fr-plan">
+    <div class="sk-kopf">
+      <h2 id="fr-titel">Frühstücksbestellung</h2>
+      <p class="hinweis-text" id="fr-zeitraum"></p>
+      <!-- Michel am 01.10.2026: auffällig dazuschreiben, wie bezahlt wird. -->
+      <div class="fr-kasse-hinweis" role="note">
+        <span class="fr-kasse-icon" aria-hidden="true">💰</span>
+        <span><b>Bezahlt wird morgens an der Vertrauenskasse.</b><br>Beim Abholen deines Frühstücks einfach den Betrag in die Kasse legen.</span>
+      </div>
+      <!-- Bleibt leer, solange die Annahme offen ist – ein Dauerhinweis „offen"
+           wäre nur Rauschen über jedem Morgen. -->
+      <p class="fr-annahme-stand" id="fr-annahme-stand"></p>
+    </div>
+
+    <div class="sk-tagchips" id="fr-tagchips"></div>
+
+    <div id="fr-tag-inhalt"></div>
+
+    <div class="karte-block" id="fr-admin-login">
+      <p class="feld-label">Veranstalter</p>
+      <p class="hinweis-text" id="fr-admin-konto-hinweis" hidden></p>
+      <div class="feld-zeile">
+        <div>
+          <input type="text" aria-label="Admin-PIN" id="fr-admin-pin" class="eingabe" placeholder="PIN" maxlength="20" autocomplete="off">
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="btn btn-secondary" id="fr-btn-admin-anmelden">Anmelden</button>
+        </div>
+      </div>
+      <p class="hinweis-text fehler" id="fr-admin-fehler"></p>
+    </div>
+
+    <div class="karte-block" id="fr-admin-panel" style="display:none">
+      <!-- Pakete zugeklappt (2026-10-01): im Betrieb stehen sie fest, aufgeklappt
+           schoben sie Einstellungen und Bestellungen weit nach unten. -->
+      <details class="es-klapp fr-pakete-klapp">
+      <summary><span class="es-klapp-titel">Pakete</span><span class="es-klapp-kurz" id="fr-pakete-kurz"></span></summary>
+      <div id="fr-pakete-verwalten"></div>
+
+      <label class="feld-label" for="fr-pak-name">Neues Paket</label>
+      <input type="text" id="fr-pak-name" class="eingabe" placeholder="Name, z. B. Klassisch" maxlength="60" autocomplete="off">
+      <input type="text" aria-label="Beschreibung des Pakets" id="fr-pak-beschreibung" class="eingabe" placeholder="Beschreibung (freiwillig)" maxlength="200" autocomplete="off" style="margin-top:8px">
+      <input type="text" aria-label="Preis des Pakets in Euro" id="fr-pak-preis" class="eingabe" placeholder="Preis in €, z. B. 2,50 (leer = kostenlos)" autocomplete="off" style="margin-top:8px">
+      <button class="btn btn-secondary btn-grow" id="fr-btn-pak-anlegen">Paket hinzufügen</button>
+      <p class="hinweis-text fehler" id="fr-pak-fehler"></p>
+      </details>
+
+      <!-- Einstellungen zugeklappt (2026-10-01), samt „entfernen“/„löschen“ –
+           die braucht man selten, und zu sind sie auch vor Fehlgriffen sicherer. -->
+      <details class="es-klapp fr-ein-klapp">
+      <summary><span class="es-klapp-titel">Einstellungen</span><span class="es-klapp-kurz" id="fr-ein-kurz"></span></summary>
+
+      <!-- ⚠️ Wirkt sofort, ohne „Einstellungen speichern" – im Gegensatz zu den
+           beiden Feldern darunter. Der Bestellschluss läuft von allein, das hier
+           ist der Griff für zwischendurch. -->
+      <label class="fr-schalter">
+        <input type="checkbox" id="fr-ein-annahme">
+        <span>Bestellannahme ist offen</span>
+      </label>
+      <p class="hinweis-text">Ausschalten, wenn gerade nichts angenommen werden soll. Die Morgen bleiben sichtbar, die Knöpfe sind dann nur ausgegraut und es steht „Geschlossen" dabei. Du als Veranstalter kannst weiter bestellen.</p>
+
+      <label class="feld-label" for="fr-ein-titel">Name der Bestellung (Überschrift)</label>
+      <input type="text" id="fr-ein-titel" class="eingabe" maxlength="60" autocomplete="off" placeholder="z. B. AgeLan #3 Frühstück">
+
+      <div class="feld-zeile">
+        <div>
+          <label class="feld-label" for="fr-ein-tage">Wie viele Tage?</label>
+          <input type="number" id="fr-ein-tage" class="eingabe" min="1" max="7">
+        </div>
+        <div>
+          <label class="feld-label" for="fr-ein-schluss">Bestellschluss</label>
+          <input type="time" id="fr-ein-schluss" class="eingabe">
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-grow" id="fr-btn-einstellungen-speichern">Einstellungen speichern</button>
+      <p class="hinweis-text fehler" id="fr-einstellungen-fehler"></p>
+
+      <button class="btn btn-secondary btn-grow" id="fr-btn-leeren">Alle Bestellungen entfernen</button>
+      <p class="hinweis-text">Die Pakete und Einstellungen bleiben stehen, nur die Bestellungen fallen weg.</p>
+
+      <button class="btn btn-danger btn-grow" id="fr-btn-plan-loeschen">Frühstücksbestellung löschen</button>
+      <p class="hinweis-text">Löscht alles: Pakete, Einstellungen und Bestellungen. Das Turnier bleibt davon unberührt.</p>
+      </details>
+      <p class="hinweis-text fehler" id="fr-admin-panel-fehler"></p>
+    </div>
+  </div>
+
+ </div>
+
+ <!-- Essensbestellung. Der Ablauf steht oben in essen-service.js: zusammen-
+      stellen -> vorne bezahlen -> wir bestellen beim Lieferanten -> abholen.
+      ⚠️ Nicht mit dem Frühstück verwechseln: dort ist eine Bestellung an einen
+      Morgen gebunden, hier ist jede Bestellung ein eigener Vorgang mit Status. -->
+ <div class="tab-section" id="tab-essen">
+
+  <!-- noch keine Essensbestellung -> anlegen -->
+  <div class="sk-view aktiv" id="es-kein-plan">
+    <!-- ⚠️ Erscheint nur, wenn Firebase das Lesen von `essen` ablehnt. Ohne
+         diesen Kasten sähe der Bereich aus wie „noch nichts angelegt", und der
+         Anlege-Knopf liefe stumm ins Leere. Der Grund ist immer derselbe: der
+         `essen`-Block fehlt in den Datenbank-Regeln. -->
+    <div class="karte-block es-regelwarnung" id="es-regelwarnung" hidden>
+      <h2>Die Datenbank lässt diesen Bereich noch nicht zu</h2>
+      <p class="hinweis-text">Essen ist ein neuer Bereich in der Datenbank, und ein neuer Bereich ist bei
+      Firebase erst einmal für alles gesperrt. Damit er aufgeht, müssen die Regeln aus
+      <code>database.rules.json</code> einmal in der Firebase-Konsole eingespielt werden
+      (Realtime Database → Regeln → einfügen → veröffentlichen). Danach genügt ein Neuladen dieser Seite.</p>
+    </div>
+
+    <div class="karte-block">
+      <h2>Essensbestellung anlegen</h2>
+      <p class="hinweis-text">Speisekarte hinterlegen, Teilnehmer stellen sich ihr Essen zusammen. Bezahlt wird vorne, danach geht eine Sammelbestellung an den Lieferanten.</p>
+
+      <label class="feld-label" for="es-neu-titel">Name</label>
+      <input type="text" id="es-neu-titel" class="eingabe" placeholder="z. B. Pizza am Samstagabend" maxlength="60" autocomplete="off">
+
+      <label class="feld-label" for="es-neu-lieferant">Lieferant</label>
+      <input type="text" id="es-neu-lieferant" class="eingabe" placeholder="z. B. Pizzeria Bella Napoli" maxlength="80" autocomplete="off">
+
+      <label class="feld-label" for="es-neu-email">E-Mail des Lieferanten</label>
+      <input type="email" id="es-neu-email" class="eingabe" placeholder="bestellung@example.de" maxlength="120" autocomplete="off">
+      <p class="hinweis-text">Dorthin geht später die Sammelbestellung. Lässt sich auch nachtragen.</p>
+
+      <div class="feld-zeile">
+        <div>
+          <label class="feld-label" for="es-neu-besteller">Wer bestellt</label>
+          <input type="text" id="es-neu-besteller" class="eingabe" maxlength="60" autocomplete="off">
+        </div>
+        <div>
+          <label class="feld-label" for="es-neu-telefon">Telefon für Rückfragen</label>
+          <input type="tel" id="es-neu-telefon" class="eingabe" maxlength="40" autocomplete="off">
+        </div>
+      </div>
+
+      <label class="feld-label" for="es-neu-pin">Veranstalter-PIN</label>
+      <input type="text" id="es-neu-pin" class="eingabe" placeholder="mindestens 6 Zeichen" minlength="6" maxlength="20" autocomplete="off">
+
+      <button class="btn btn-primary btn-grow" id="es-btn-erstellen">Essensbestellung anlegen</button>
+      <p class="hinweis-text fehler" id="es-neu-fehler"></p>
+    </div>
+  </div>
+
+  <!-- Essensbestellung vorhanden -->
+  <div class="sk-view" id="es-plan">
+    <div class="sk-kopf">
+      <h2 id="es-titel">Essensbestellung</h2>
+      <p class="hinweis-text" id="es-kopfzeile"></p>
+    </div>
+
+    <div id="es-karte"></div>
+    <div id="es-korb"></div>
+    <div id="es-meine"></div>
+
+    <div class="karte-block" id="es-admin-login">
+      <p class="feld-label">Veranstalter</p>
+      <p class="hinweis-text" id="es-admin-konto-hinweis" hidden></p>
+      <div class="feld-zeile">
+        <div>
+          <input type="text" aria-label="Admin-PIN" id="es-admin-pin" class="eingabe" placeholder="PIN" maxlength="20" autocomplete="off">
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="btn btn-secondary" id="es-btn-admin-anmelden">Anmelden</button>
+        </div>
+      </div>
+      <p class="hinweis-text fehler" id="es-admin-login-fehler"></p>
+    </div>
+
+    <div id="es-admin" style="display:none">
+
+      <div class="karte-block">
+        <p class="feld-label">Alle Bestellungen</p>
+        <div id="es-admin-bestellungen"></div>
+        <p class="hinweis-text fehler" id="es-admin-fehler"></p>
+      </div>
+
+      <div class="karte-block" id="es-sammelmail"></div>
+
+      <div class="karte-block">
+        <!-- ⚠️ Zugeklappt. Die Karte wird einmal eingerichtet und steht danach
+             nur noch im Weg – zwischen der Bestellliste und den Einstellungen,
+             die man am Abend wirklich braucht. Der Zustand haengt am
+             details-Element selbst: es ueberlebt jedes Neuzeichnen, nur der Inhalt
+             wird ersetzt. Nach einem Neuladen ist es wieder zu, wie bei den
+             Lieferungen. -->
+        <details class="es-klapp">
+        <summary><span class="es-klapp-titel">Speisekarte</span><span class="es-klapp-kurz" id="es-karte-anzahl"></span></summary>
+        <div id="es-karte-verwalten"></div>
+
+        <label class="feld-label" for="es-ger-nummer">Neues Gericht</label>
+        <input type="text" id="es-ger-nummer" class="eingabe" placeholder="Bestellnummer, z. B. 12 (freiwillig)" maxlength="10" autocomplete="off">
+        <input type="text" aria-label="Name des Gerichts" id="es-ger-name" class="eingabe" placeholder="Name, z. B. Pizza Salami" maxlength="80" autocomplete="off" style="margin-top:8px">
+        <input type="text" aria-label="Beschreibung des Gerichts" id="es-ger-beschreibung" class="eingabe" placeholder="Beschreibung (freiwillig)" maxlength="200" autocomplete="off" style="margin-top:8px">
+        <input type="text" aria-label="Kategorie des Gerichts" id="es-ger-kategorie" class="eingabe" placeholder="Kategorie, z. B. Pizza (freiwillig)" maxlength="40" autocomplete="off" style="margin-top:8px">
+        <input type="text" aria-label="Preis des Gerichts in Euro" id="es-ger-preis" class="eingabe" placeholder="Preis in €, z. B. 9,50 (leer = kostenlos)" autocomplete="off" style="margin-top:8px">
+        <button class="btn btn-secondary btn-grow" id="es-btn-ger-anlegen">Gericht hinzufügen</button>
+        <p class="hinweis-text fehler" id="es-gericht-fehler"></p>
+        </details>
+      </div>
+
+      <!-- Import: eine ganze Karte auf einmal, statt 40 Gerichte einzeln
+           anzulegen. Die Vorschau steht bewusst zwischen Einfügen und
+           Übernehmen – ein Import, der sofort schreibt, wäre bei einem
+           Formatfehler nicht mehr zurückzuholen. -->
+      <div class="karte-block">
+        <details class="es-klapp">
+        <summary><span class="es-klapp-titel">Speisekarte importieren</span></summary>
+        <p class="hinweis-text">Ein Gericht je Zeile. Felder mit <b>|</b> trennen: <i>Nummer | Name | Beschreibung | Preis</i>. Eine Zeile mit <b>#</b> davor beginnt eine Kategorie. Nummer, Beschreibung und Preis darf man weglassen.</p>
+        <p class="hinweis-text">Die <b>Bestellnummer</b> wird nur erkannt, wenn sie ganz vorn steht und aus Ziffern besteht (auch „12a“ oder „A3“). Ein Gericht, das mit einer Zahl anfängt – „4 Käse Pizza“ – bleibt dadurch ein Name und wird nicht zur Nummer.</p>
+        <textarea aria-label="Speisekarte zum Einlesen" id="es-import-text" class="eingabe es-import-feld" rows="8" spellcheck="false" placeholder="# Pizza&#10;12 | Margherita | Tomate, Käse | 8,50&#10;13 | Salami | Tomate, Käse, Salami | 9,50&#10;&#10;# Beilagen&#10;40 | Pommes | 3,00"></textarea>
+        <button class="btn btn-secondary btn-grow" id="es-btn-import-pruefen">Vorschau anzeigen</button>
+        <div id="es-import-vorschau"></div>
+        <p class="hinweis-text fehler" id="es-import-fehler"></p>
+        </details>
+      </div>
+
+      <div class="karte-block">
+        <details class="es-klapp">
+        <summary><span class="es-klapp-titel">Einstellungen</span><span class="es-klapp-kurz" id="es-ein-kurz"></span></summary>
+
+        <!-- ⚠️ Der Name IST der Tag. Ihn zu ändern ist der Weg in einen neuen
+             Tag: die Nummerierung der Sammelbestellungen fängt wieder bei 1 an,
+             alles Bisherige bleibt stehen und behält seinen Namen. -->
+        <label class="feld-label" for="es-ein-titel">Tag</label>
+        <input type="text" id="es-ein-titel" class="eingabe" maxlength="60" autocomplete="off" placeholder="z. B. Donnerstag">
+        <p class="hinweis-text">So heißt der Tag oben auf der Seite, und so heißen die Sammelbestellungen: „Donnerstag 1“, „Donnerstag 2“ … Trag hier <b>Freitag</b> ein, wenn der nächste Tag beginnt – die Zählung fängt dann wieder bei 1 an, und alles vom Vortag bleibt mit seinem Namen stehen. Nichts geht verloren.</p>
+        <p class="hinweis-text" id="es-ein-tagstand"></p>
+
+        <label class="es-schalter">
+          <input type="checkbox" id="es-ein-annahme">
+          <span>Bestellannahme ist offen</span>
+        </label>
+        <p class="hinweis-text">Ausschalten, sobald die Sammelbestellung rausgeht – dann kommt nichts Neues mehr dazu.</p>
+
+        <!-- ⚠️ Das Zeitfenster ist etwas anderes als der Schalter darüber: der
+             Schalter ist der Griff für zwischendurch, das Fenster läuft von
+             allein. Beide müssen zutreffen, damit bestellt werden kann. -->
+        <label class="feld-label">Bestellzeiten</label>
+        <div class="feld-zeile">
+          <div>
+            <label class="feld-label" for="es-ein-von">Von</label>
+            <input type="time" id="es-ein-von" class="eingabe">
+          </div>
+          <div>
+            <label class="feld-label" for="es-ein-bis">Bis</label>
+            <input type="time" id="es-ein-bis" class="eingabe">
+          </div>
+        </div>
+        <p class="hinweis-text">Außerhalb dieser Zeiten nimmt die App keine Bestellungen an. Beide Felder leer lassen heißt: rund um die Uhr. Ein Fenster über Mitternacht geht auch – etwa 18:00 bis 02:00.</p>
+        <p class="hinweis-text" id="es-ein-fensterstand"></p>
+
+        <label class="feld-label" for="es-ein-lieferant">Lieferant</label>
+        <input type="text" id="es-ein-lieferant" class="eingabe" maxlength="80" autocomplete="off">
+
+        <label class="feld-label" for="es-ein-email">E-Mail des Lieferanten</label>
+        <input type="email" id="es-ein-email" class="eingabe" maxlength="120" autocomplete="off">
+
+        <div class="feld-zeile">
+          <div>
+            <label class="feld-label" for="es-ein-besteller">Wer bestellt</label>
+            <input type="text" id="es-ein-besteller" class="eingabe" maxlength="60" autocomplete="off">
+          </div>
+          <div>
+            <label class="feld-label" for="es-ein-telefon">Telefon</label>
+            <input type="tel" id="es-ein-telefon" class="eingabe" maxlength="40" autocomplete="off">
+          </div>
+        </div>
+
+        <label class="feld-label" for="es-ein-hinweis">Zusatz für die E-Mail</label>
+        <textarea id="es-ein-hinweis" class="eingabe es-hinweis-feld" rows="3" maxlength="400" placeholder="z. B. Lieferadresse, gewünschte Uhrzeit"></textarea>
+
+        <button class="btn btn-secondary btn-grow" id="es-btn-ein-speichern">Einstellungen speichern</button>
+        <p class="hinweis-text fehler" id="es-ein-fehler"></p>
+        </details>
+      </div>
+
+      <!-- Statistik. Zugeklappt, weil sie zum Arbeiten nicht gebraucht wird -
+           aufgeklappt bleibt sie ueber ein Neuzeichnen hinweg offen.
+           Steht bewusst WEIT UNTEN: sie ist zum Nachschauen da, nicht zum
+           Arbeiten, und stand zwischen der Bestellliste und der Sammelmail im
+           Weg. Vor der Loesch-Zone, damit die das Letzte bleibt. -->
+      <div class="karte-block" id="es-statistik"></div>
+
+      <!-- ⚠️ Zugeklappt ist hier mehr als Ordnung: die beiden Knoepfe loeschen
+           unwiederbringlich, und zugeklappt kann man sie nicht im Vorbeiscrollen
+           erwischen. Beide fragen zusaetzlich nach. -->
+      <div class="karte-block">
+        <details class="es-klapp">
+        <summary><span class="es-klapp-titel">Löschen und zurücksetzen</span><span class="es-klapp-kurz">nicht rückgängig zu machen</span></summary>
+
+        <button class="btn btn-secondary btn-grow" id="es-btn-leeren">Alle Bestellungen entfernen</button>
+        <p class="hinweis-text">Die Speisekarte und die Einstellungen bleiben stehen.</p>
+
+        <button class="btn btn-danger btn-grow" id="es-btn-plan-loeschen">Essensbestellung löschen</button>
+        <p class="hinweis-text">Löscht alles: Speisekarte, Einstellungen und Bestellungen. Turnier, Stream und Frühstück bleiben unberührt.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+
+ </div>
+
+ <!-- Downloads: kein eigener Firebase-Knoten, keine eigene Datei – rein
+      statischer Inhalt hinter der allgemeinen Anmeldung, genau wie die
+      Übersicht ohne den Live-Teil. Neue Dateien kommen dazu, ohne dass an
+      der Anmeldung oder an activateTab() etwas geändert werden muss. -->
+ <div class="tab-section" id="tab-downloads">
+  <div class="karte-block">
+    <h2>📥 Downloads</h2>
+    <p class="hinweis-text">Werkzeuge zum Herunterladen für die AgeLan.</p>
+
+    <div class="karte-block">
+      <h2>AoE2-Klickzähler (Spieler)</h2>
+      <p class="hinweis-text">Für das 2vs2-Coop-Turnier. Auf dem eigenen Rechner starten, bevor es losgeht.</p>
+      <a class="btn btn-primary btn-grow dl-link" href="downloads/AoE2Klickzaehler_Spieler.exe?v=1.3" download>⬇ AoE2Klickzaehler_Spieler.exe · Version 1.2 (10,2 MB)</a>
+      <p class="hinweis-text">Windows zeigt bei einer .exe von einer unbekannten Quelle evtl. eine Warnung („Windows hat den Computer geschützt“). Auf <b>Weitere Informationen</b> und dann <b>Trotzdem ausführen</b> tippen.</p>
+    </div>
+
+    <div class="karte-block">
+      <h2>DC3-MapPack</h2>
+      <p class="hinweis-text">Die Karten für das 2vs2-Coop-Turnier. Auf dem eigenen Rechner installieren, bevor es losgeht.</p>
+      <a class="btn btn-primary btn-grow dl-link" href="downloads/DC3-MapPack-Installer.exe?v=1" download>⬇ DC3-MapPack-Installer.exe (5,6 MB)</a>
+      <p class="hinweis-text">Auch hier kann Windows warnen („Windows hat den Computer geschützt“). Auf <b>Weitere Informationen</b> und dann <b>Trotzdem ausführen</b> tippen.</p>
+    </div>  </div>
+ </div>
+
+ <div class="tab-section" id="tab-einstellungen">
+   <!-- Hell/Dunkel gehört NICHT auf die Übersicht – die ist ein Anzeigebildschirm
+        für alle. Gilt nur für dieses Gerät; Inhalt und Klick kommen aus thema.js. -->
+   <div class="karte-block">
+     <h2>Darstellung (dieses Gerät)</h2>
+     <button type="button" class="thema-feld" data-thema-feld></button>
+   </div>
+
+   <div class="karte-block">
+     <h2>Angemeldete Nutzer</h2>
+     <p class="hinweis-text">Alle, die sich ein Konto angelegt haben. ⭐ ist Veranstalter, 🛠 gehört zur Organisation.</p>
+     <p class="hinweis-text">Das Häkchen <b>🛠</b> nimmt jemanden in die Organisation auf: die Person bekommt damit <b>alle Rechte</b> – wie ein Veranstalter, nur ohne das Veranstalter-Passwort – und <b>zahlt beim Essen nichts</b>. Bei Veranstaltern ist es fest gesetzt, sie gehören immer dazu.</p>
+     <p class="hinweis-text">Das Häkchen <b>🎥</b> gibt frei, sich in den Streamplan einzutragen – ohne das Häkchen darf man ihn nur lesen. Es zählt für <b>jeden</b>: auch Veranstalter und Organisation tragen sich nur mit diesem Häkchen ein. Den Plan verwalten (Programm anlegen, löschen) dürfen sie weiterhin ohne.</p>
+     <!-- ⚠️ Bewusst nur JA/NEIN, nie die Zahl selbst: der Veranstalter muss
+          wissen, wer noch keine hinterlegt hat - die ID braucht er dafuer
+          nicht, und sie steht auch niemandem sonst zu. -->
+     <p class="hinweis-text">Steht <b>💬❌</b> hinter einem Namen, hat die Person keine Discord-ID hinterlegt und bekommt <b>keine Nachricht</b>, wenn ihr Essen bereitliegt. Eintragen kann sie nur sie selbst – oben auf den eigenen Namen tippen, dann „Mein Konto“. Die ID selbst siehst du hier nicht.</p>
+     <!-- Kein Lade-Knopf mehr (seit 2026-10-01): die Liste lädt beim Öffnen des
+          Reiters selbst und hält sich danach im Hintergrund aktuell. -->
+     <p class="hinweis-text konten-stand" id="konten-stand"></p>
+     <!-- Suche und Filter. Stehen AUSSERHALB von #konten-liste, damit sie das
+          Neuladen nach jedem Haken überleben – sonst wäre die Suche nach jedem
+          Klick weg. Erst sichtbar, wenn die Liste geladen ist. -->
+     <div class="konten-filter" id="konten-filter" hidden>
+       <input type="search" id="konten-suche" class="eingabe" placeholder="Name suchen …" autocomplete="off" aria-label="Konten nach Namen durchsuchen">
+       <div class="konten-chips" id="konten-chips" role="group" aria-label="Konten filtern"></div>
+     </div>
+     <div id="konten-liste"></div>
+     <p class="hinweis-text fehler" id="konten-fehler"></p>
+   </div>
+
+   <div class="karte-block">
+     <h2>Übersicht</h2>
+     <p class="hinweis-text">Welche Kacheln auf der Übersicht stehen – das gilt für <b>alle</b>, nicht nur für dieses Gerät. Die Reihenfolge ist fest: Essen, Frühstück, Orga, Turnier, Infos.</p>
+     <div id="ub-einstellungen" class="ub-einstellungen"></div>
+     <p class="hinweis-text fehler" id="ub-einstellungen-fehler"></p>
+   </div>
+
+   <div class="karte-block">
+     <h2>Allgemeine Infos</h2>
+     <p class="hinweis-text">Erscheinen auf der Übersicht als eigene Kachel „ℹ️ Infos“ – für <b>alle</b> sichtbar. Jede Zeile wird ein Punkt. Eine Zeile mit <b>#</b> am Anfang wird eine Zwischenüberschrift. Leer lassen blendet die Kachel aus.</p>
+     <textarea id="ub-infos-text" class="eingabe ub-infos-eingabe" rows="8" maxlength="2000"
+               placeholder="# WLAN&#10;Netz: AgeLan · Passwort hängt am Eingang&#10;# Ruhezeit&#10;Ab 2:00 Uhr bitte Kopfhörer"></textarea>
+     <button type="button" class="btn btn-primary btn-grow" id="ub-infos-speichern">Infos speichern</button>
+     <p class="hinweis-text" id="ub-infos-meldung"></p>
+   </div>
+
+   <div class="karte-block">
+     <h2>Nach der Veranstaltung</h2>
+     <p class="hinweis-text">Löscht ALLE Konten – auch dein eigenes. Danach legt jede:r für die nächste AgeLan ein neues an. Nicht umkehrbar.</p>
+     <button class="btn btn-danger btn-grow" id="btn-konten-leeren">Alle Konten löschen</button>
+     <p class="hinweis-text fehler" id="konten-leeren-fehler"></p>
+   </div>
+
+   <!-- ⚠️ Hier stand bis 2026-09-07 die Änderungsliste (davor im Info-Reiter,
+        den es seit 2026-09-03 nicht mehr gibt). Sie ist mit dem Flotten-Umbau
+        vom 07.09.2026 aus der Anzeige genommen: Karten dieser Art zeigen den
+        Zustand, nicht die Historie. APP_CHANGELOG bleibt in app.js stehen und
+        wird weitergepflegt. Was die App kann, steht jetzt im Vorraum unter
+        „Funktionen“ – dort sieht es jede:r, auch ohne Veranstalter-Konto. -->
+ </div>
+
+</div>
+</main>
+
+<!-- ============ Modal: Ergebnis melden ============ -->
+<div class="modal-overlay" id="modal-melden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="melden-titel">
+    <h3 id="melden-titel" tabindex="-1">Ergebnis melden</h3>
+    <div class="melden-teams">
+      <div class="melden-team">
+        <span class="melden-teamname" id="melden-name-a">Team A</span>
+        <input type="number" id="melden-saetze-a" aria-label="Gewonnene Sätze, erstes Team" class="eingabe saetze-input" min="0" value="0">
+      </div>
+      <span class="melden-doppelpunkt">:</span>
+      <div class="melden-team">
+        <span class="melden-teamname" id="melden-name-b">Team B</span>
+        <input type="number" id="melden-saetze-b" aria-label="Gewonnene Sätze, zweites Team" class="eingabe saetze-input" min="0" value="0">
+      </div>
+    </div>
+    <p class="hinweis-text" id="melden-hinweis"></p>
+    <p class="hinweis-text fehler" id="melden-fehler"></p>
+    <button class="btn btn-primary btn-grow" id="btn-melden-speichern">Speichern</button>
+    <button class="btn btn-link" id="btn-melden-abbrechen">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ============ Modal: Veranstalter ============ -->
+<div class="modal-overlay" id="modal-admin">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="admin-titel">
+    <h3 id="admin-titel" tabindex="-1">Veranstalter</h3>
+    <div id="admin-login">
+      <p class="hinweis-text" id="admin-konto-hinweis" hidden></p>
+      <label class="feld-label" for="admin-pin">Admin-PIN eingeben</label>
+      <input type="text" id="admin-pin" class="eingabe" placeholder="PIN" maxlength="20" autocomplete="off">
+      <button class="btn btn-primary btn-grow" id="btn-admin-anmelden">Anmelden</button>
+      <p class="hinweis-text fehler" id="admin-fehler"></p>
+    </div>
+    <div id="admin-panel" style="display:none">
+      <p class="hinweis-text" id="admin-panel-info">Du bist als Veranstalter angemeldet.</p>
+      <button class="btn btn-secondary btn-grow" id="btn-admin-reset">Turnier zurücksetzen</button>
+      <p class="hinweis-text">Teams, Gruppen und Spiele werden verworfen. Alle Angemeldeten bleiben drin, ihr könnt sofort neu auslosen.</p>
+      <button class="btn btn-danger btn-grow" id="btn-admin-loeschen">Turnier löschen</button>
+      <p class="hinweis-text">Löscht das ganze Turnier samt Anmeldungen und PIN. Nicht umkehrbar.</p>
+      <p class="hinweis-text fehler" id="admin-panel-fehler"></p>
+    </div>
+    <button class="btn btn-link" id="btn-admin-schliessen">Schließen</button>
+  </div>
+</div>
+
+<!-- ============ Modal: Zeitplan ============ -->
+<!-- ⚠️ EIN Dialog für Gruppenphase und K.-o. Zwei Karten in zwei Screens
+     waeren zwei Stellen, an denen dieselbe Aenderung nachzuziehen ist. -->
+<div class="modal-overlay" id="modal-zeitplan">
+  <div class="modal modal-breit" role="dialog" aria-modal="true" aria-labelledby="zp-titel">
+    <h3 id="zp-titel" tabindex="-1">Zeitplan</h3>
+    <p class="hinweis-text">Die App verteilt alle noch offenen Spiele der Reihe nach. Schon bestätigte Spiele bleiben stehen – so kannst du mittendrin nachplanen, wenn es hinterherhinkt.</p>
+
+    <div class="zp-felder">
+      <div class="zp-feld">
+        <label class="feld-label" for="zp-start-datum">Erster Spieltag</label>
+        <input type="date" id="zp-start-datum" class="eingabe">
+      </div>
+      <div class="zp-feld">
+        <label class="feld-label" for="zp-start-zeit">Beginn</label>
+        <input type="time" id="zp-start-zeit" class="eingabe">
+      </div>
+      <div class="zp-feld">
+        <label class="feld-label" for="zp-tages-ende">Schluss für heute</label>
+        <input type="time" id="zp-tages-ende" class="eingabe">
+      </div>
+      <div class="zp-feld">
+        <label class="feld-label" for="zp-dauer">Dauer je Spiel (Min)</label>
+        <input type="number" id="zp-dauer" class="eingabe" min="5" max="600" step="5">
+      </div>
+      <div class="zp-feld">
+        <label class="feld-label" for="zp-pause">Pause dazwischen (Min)</label>
+        <input type="number" id="zp-pause" class="eingabe" min="0" max="240" step="5">
+      </div>
+      <div class="zp-feld">
+        <label class="feld-label" for="zp-gleichzeitig">Spiele gleichzeitig</label>
+        <input type="number" id="zp-gleichzeitig" class="eingabe" min="1" max="8" step="1">
+      </div>
+    </div>
+    <p class="hinweis-text">Ein Spiel bis zu 10 Stunden ist möglich. Passt ein Spiel nicht mehr vor den Schluss, geht es am nächsten Tag zur Beginnzeit weiter. Ein Schluss vor dem Beginn (z. B. 18:00 bis 02:00) gilt als nach Mitternacht. Ein Team steht nie auf zwei Plätzen gleichzeitig, und eine Runde fängt erst an, wenn die vorige durch ist.</p>
+    <button class="btn btn-primary btn-grow" id="btn-zp-erzeugen">Zeitplan erzeugen</button>
+    <p class="hinweis-text fehler" id="zp-fehler"></p>
+    <p class="hinweis-text" id="zp-meldung"></p>
+
+    <div class="karte-block">
+      <p class="feld-label">Einzeln verschieben</p>
+      <p class="hinweis-text" id="zp-liste-hinweis"></p>
+      <div id="zp-liste"></div>
+    </div>
+
+    <button class="btn btn-secondary btn-grow" id="btn-zp-loeschen">Alle Zeiten löschen</button>
+    <button class="btn btn-link" id="btn-zp-schliessen">Schließen</button>
+  </div>
+</div>
+
+<!-- ============ Modal: Zeit belegen ============ -->
+<div class="modal-overlay" id="modal-stream">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sk-dlg-titel-text">
+    <h3 id="sk-dlg-titel-text" tabindex="-1">Zeit belegen</h3>
+
+    <label class="feld-label" for="sk-dlg-tag">Tag</label>
+    <select id="sk-dlg-tag" class="eingabe"></select>
+
+    <div class="feld-zeile">
+      <div>
+        <label class="feld-label" for="sk-dlg-von">Von</label>
+        <select id="sk-dlg-von" class="eingabe"></select>
+      </div>
+      <div>
+        <label class="feld-label" for="sk-dlg-bis">Bis</label>
+        <select id="sk-dlg-bis" class="eingabe"></select>
+      </div>
+    </div>
+
+    <label class="feld-label" for="sk-dlg-name">Dein Name</label>
+    <input type="text" id="sk-dlg-name" class="eingabe" maxlength="40" autocomplete="off">
+
+    <label class="feld-label" for="sk-dlg-was">Was läuft in der Zeit?</label>
+    <input type="text" id="sk-dlg-was" class="eingabe" placeholder="z. B. Cast Gruppenphase" maxlength="60" autocomplete="off">
+
+    <label class="feld-label" for="sk-dlg-notiz">Notiz (freiwillig)</label>
+    <input type="text" id="sk-dlg-notiz" class="eingabe" maxlength="200" autocomplete="off">
+
+    <p class="hinweis-text" id="sk-dlg-hinweis"></p>
+    <p class="hinweis-text fehler" id="sk-dlg-fehler"></p>
+
+    <button class="btn btn-primary btn-grow" id="sk-dlg-speichern">Speichern</button>
+    <button class="btn btn-danger btn-grow" id="sk-dlg-loeschen" style="display:none">Belegung entfernen</button>
+    <button class="btn btn-link" id="sk-dlg-abbrechen">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ============ Modal: Programmpunkt ============ -->
+<div class="modal-overlay" id="modal-programm">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sk-prg-titel-text">
+    <h3 id="sk-prg-titel-text" tabindex="-1">Programmpunkt anlegen</h3>
+
+    <label class="feld-label" for="sk-prg-tag">Tag</label>
+    <select id="sk-prg-tag" class="eingabe"></select>
+
+    <div class="feld-zeile">
+      <div>
+        <label class="feld-label" for="sk-prg-von">Von</label>
+        <select id="sk-prg-von" class="eingabe"></select>
+      </div>
+      <div>
+        <label class="feld-label" for="sk-prg-bis">Bis</label>
+        <select id="sk-prg-bis" class="eingabe"></select>
+      </div>
+    </div>
+
+    <label class="feld-label" for="sk-prg-was">Was steht an?</label>
+    <input type="text" id="sk-prg-was" class="eingabe" placeholder="z. B. Gruppenphase" maxlength="60" autocomplete="off">
+
+    <label class="feld-label" for="sk-prg-notiz">Notiz (freiwillig)</label>
+    <input type="text" id="sk-prg-notiz" class="eingabe" maxlength="200" autocomplete="off">
+
+    <label class="es-schalter" id="sk-prg-streamer-zeile">
+      <input type="checkbox" id="sk-prg-streamer" checked>
+      <span>Dafür wird ein Streamer gebraucht</span>
+    </label>
+    <p class="hinweis-text" id="sk-prg-streamer-hinweis"></p>
+
+    <p class="hinweis-text" id="sk-prg-hinweis"></p>
+    <p class="hinweis-text fehler" id="sk-prg-fehler"></p>
+
+    <button class="btn btn-primary btn-grow" id="sk-prg-speichern">Speichern</button>
+    <button class="btn btn-danger btn-grow" id="sk-prg-loeschen" style="display:none">Programmpunkt entfernen</button>
+    <button class="btn btn-link" id="sk-prg-abbrechen">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+// Passwort-Gate. Prüft serverseitig gegen das Worker-Secret PW_AGELAN (Scope
+// agelan-zugang) und lädt die App-Skripte ERST nach der Freigabe. Damit steht
+// vor der Eingabe weder eine Firebase-Verbindung noch ein Datenabruf.
+//
+// Der Zugang wird in localStorage gemerkt, nicht in sessionStorage wie bei den
+// übrigen Seiten der Flotte: über vier Veranstaltungstage soll das Passwort
+// wirklich nur einmal je Gerät nötig sein.
+(function () {
+  var GATEWAY = 'https://agelan-klon.michel-brunner.workers.dev';
+  var WEBSITE = 'https://tecko1985.github.io/agelan-backend/';
+  var KONTO_KEY = 'agelan_konto';   // { nickname, token }
+  var SKRIPTE = [
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
+    'firebase-mock.js?v=1.0',
+    'firebase-config.js?v=1.0',
+    'verbindung.js?v=1.0',
+    'turnier-service.js?v=2.20',
+    'app.js?v=3.95',
+    'stream-service.js?v=2.7',
+    'stream-app.js?v=2.16',
+    'fruehstueck-service.js?v=1.19',
+    'fruehstueck-app.js?v=1.27',
+    'essen-service.js?v=2.28',
+    'essen-app.js?v=2.37',
+    'uebersicht-app.js?v=1.18'
+  ];
+
+  var input = document.getElementById('pw-gate-input');
+  var btn = document.getElementById('pw-gate-btn');
+  var msg = document.getElementById('pw-gate-msg');
+  var gate = document.getElementById('pw-gate');
+  var gateTitel = document.getElementById('pw-gate-titel');
+  var hub = document.getElementById('start-hub');
+  var zurueck = document.getElementById('pw-gate-zurueck');
+  var box = gate.querySelector('.pw-box');
+  var wechsel = document.getElementById('pw-wechsel');
+  var nickFeld = document.getElementById('pw-nick');
+  var lanFeld = document.getElementById('pw-lan');
+  var veranstalterFeld = document.getElementById('pw-veranstalter');
+
+  // Welchen Bereich hat der Klick im Vorraum gemeint? Nach der Anmeldung soll
+  // die App genau dort aufgehen und nicht auf dem Turnier-Tab.
+  var zielTab = null;
+  var ZIEL_NAMEN = { turnier: 'Turnier', stream: 'Stream', fruehstueck: 'Frühstück', essen: 'Essen', downloads: 'Downloads' };
+  var frei = false;
+  var modusNeu = false;   // false = anmelden, true = Konto anlegen
+
+  // --- Konto merken ---------------------------------------------------------
+  function kontoLesen() {
+    try {
+      var roh = localStorage.getItem(KONTO_KEY);
+      return roh ? JSON.parse(roh) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function kontoSchreiben(konto) {
+    try {
+      if (konto) localStorage.setItem(KONTO_KEY, JSON.stringify(konto));
+      else localStorage.removeItem(KONTO_KEY);
+    } catch (e) { /* privater Modus: dann gilt die Anmeldung nur für diesen Besuch */ }
+  }
+
+  // Der Name steht in der Kopfzeile. Das läuft schon, bevor die App-Skripte
+  // geladen sind – die Kopfzeile ist Teil des HTML.
+  function kontoAnzeigen(konto) {
+    var el = document.getElementById('kopf-konto');
+    if (el) {
+      if (konto && konto.nickname) {
+        el.textContent = (konto.admin ? '⭐ ' : '👤 ') + konto.nickname;
+        // ⚠️ Ohne hinterlegte Discord-ID bekommt die Person KEINE Nachricht,
+        // wenn ihr Essen bereitliegt. Der gelbe Punkt am Namen ist der einzige
+        // Hinweis darauf - sonst faellt es erst auf, wenn das Essen kalt ist.
+        el.classList.toggle('konto-ohne-discord', !konto.discordId);
+        el.title = (konto.admin
+          ? 'Angemeldet als ' + konto.nickname + ' (Veranstalter)'
+          : 'Angemeldet als ' + konto.nickname)
+          + (konto.discordId ? '' : ' – noch keine Discord-ID hinterlegt')
+          + '\nKlicken für „Mein Konto“';
+        el.hidden = false;
+      } else {
+        el.textContent = '';
+        el.hidden = true;
+      }
+    }
+    // Die App-Oberflächen belegen ihre Namensfelder damit vor.
+    window.__AGELAN_KONTO__ = konto || null;
+  }
+
+  // --- Skripte nachladen ----------------------------------------------------
+  // Gleichzeitig LADEN, aber der Reihe nach AUSFÜHREN: firebase-config braucht
+  // das Firebase-SDK, die Services die Konfiguration, die Oberflächen die
+  // Services. `async = false` an eingefügten <script>-Tags garantiert genau das.
+  // ⚠️ Bis 2026-10-01 kam jedes Skript erst, wenn das vorige fertig war – 14
+  // Wartezeiten hintereinander, am Handy der größte Teil der Ladezeit.
+  function ladeSkripte(fertig) {
+    var fehler = false;
+    SKRIPTE.forEach(function (src, i) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.async = false;
+      // Das letzte läuft als letztes – danach ist alles da.
+      if (i === SKRIPTE.length - 1) s.onload = function () { if (!fehler) fertig(); };
+      s.onerror = function () {
+        fehler = true;
+        msg.style.color = '#c0392b';
+        msg.textContent = 'Die Seite konnte nicht vollständig geladen werden.';
+        ladeFehlerZeigen();
+      };
+      document.body.appendChild(s);
+    });
+  }
+
+  // ⚠️ #pw-gate-msg allein reicht nicht: wer ein gemerktes Konto hat, sieht den
+  // Dialog nie – die Meldung stand unsichtbar darin, und der Vorraum sah aus,
+  // als ginge alles, nur die Reiter blieben leer (Bugjagd 25.09.d T5-5). Deshalb
+  // eine eigene Leiste ganz oben mit „Neu laden“. Neu laden statt Nachladen:
+  // schon geladene Skripte ein zweites Mal einzuhängen, zerlegte den geteilten
+  // Scope (doppelte const).
+  function ladeFehlerZeigen() {
+    if (document.getElementById('lade-fehler')) return;
+    var leiste = document.createElement('div');
+    leiste.id = 'lade-fehler';
+    leiste.setAttribute('role', 'alert');
+    leiste.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;background:#fdecea;color:#7f1d1d;' +
+      'border-bottom:2px solid #c0392b;padding:10px 16px;font-size:15px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;';
+    var text = document.createElement('span');
+    text.textContent = 'Die Seite konnte nicht vollständig geladen werden – meist ist das Netz kurz weg.';
+    var knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.textContent = 'Neu laden';
+    knopf.style.cssText = 'padding:6px 14px;border-radius:999px;border:1px solid #c0392b;background:#fff;color:#7f1d1d;font-weight:600;cursor:pointer;';
+    knopf.addEventListener('click', function () { location.reload(); });
+    leiste.appendChild(text);
+    leiste.appendChild(knopf);
+    document.body.appendChild(leiste);
+  }
+
+  // ⚠️ Der Vorraum wird NICHT aus dem DOM entfernt, nur versteckt: er ist das
+  // Dashboard, auf das der Kopfzeilen-Titel jederzeit zurückführt.
+  function zeigeHub() { if (hub) hub.hidden = false; }
+  function versteckeHub() { if (hub) hub.hidden = true; }
+
+  // `danach` laeuft ERST, wenn die Skripte da sind und das Gate zu ist -
+  // ein Dialog, der vorher aufgeht, stuende unter dem Anmeldefenster.
+  function freigeben(danach) {
+    // Das Ziel muss VOR dem Laden stehen: app.js wertet es beim Start aus.
+    if (zielTab) { window.__AGELAN_START_TAB__ = zielTab; }
+    else {
+      // Kein Klick im Vorraum, also ein Neuladen. ⚠️ Dann gehört man dorthin
+      // zurück, wo man war – ohne das landet jedes F5 im Turnier, und wer
+      // gerade Essen abrechnet, klickt sich jedes Mal neu durch.
+      try {
+        var letzter = localStorage.getItem('agelan_tab');
+        if (letzter) { window.__AGELAN_START_TAB__ = letzter; }
+      } catch (e) { /* privater Modus: dann eben das Turnier */ }
+    }
+    frei = true;
+    if (hub) hub.classList.add('frei');   // blendet Schlösser und Hinweis aus
+    ladeSkripte(function () {
+      if (gate) gate.hidden = true;
+      versteckeHub();
+      if (typeof danach === 'function') danach();
+    });
+  }
+
+  // Klick auf eine Kachel: solange nicht angemeldet, fragt sie nach dem Konto –
+  // danach ist sie einfach der Weg in den Bereich.
+  function oeffneBereich(ziel) {
+    if (!frei) return oeffneGate(ziel);
+    // activateTab kommt aus app.js und steht erst nach dem Nachladen bereit.
+    if (typeof activateTab === 'function') activateTab(ziel);
+    versteckeHub();
+  }
+
+  // --- Anmeldemaske ---------------------------------------------------------
+  function modusSetzen(neu) {
+    modusNeu = !!neu;
+    box.classList.toggle('modus-neu', modusNeu);
+    // ⚠️ Die Überschrift gehört zum Modus, nicht zum Ziel: im Anlegen-Modus
+    // stünde über der Maske sonst „Turnier öffnen“, während darunter nach dem
+    // Passwort der Veranstaltung gefragt wird – zwei verschiedene Dinge.
+    gateTitel.textContent = modusNeu
+      ? 'Konto anlegen'
+      : (ZIEL_NAMEN[zielTab] || 'AgeLan') + ' öffnen';
+    btn.textContent = modusNeu ? 'Konto anlegen' : 'Anmelden';
+    wechsel.textContent = 'Noch kein Konto? Auf der AGE-LAN-Website anlegen ↗';
+    input.setAttribute('autocomplete', modusNeu ? 'new-password' : 'current-password');
+    input.setAttribute('placeholder', modusNeu ? 'Neues Passwort, mindestens 4 Zeichen' : 'Dein Passwort');
+    msg.textContent = '';
+  }
+
+  function oeffneGate(ziel) {
+    zielTab = ziel;
+    msg.textContent = '';
+    btn.disabled = false;
+    gate.hidden = false;
+    // Ein bekannter Name wird vorbelegt – nur das Passwort ist dann noch zu tippen.
+    var bekannt = kontoLesen();
+    nickFeld.value = (bekannt && bekannt.nickname) || nickFeld.value || '';
+    input.value = '';
+    lanFeld.value = '';
+    veranstalterFeld.value = '';
+    // ⚠️ Wer noch kein Konto im Browser liegen hat, ist beim ersten Mal hier –
+    // und braucht als Erstes ein Konto, kein Anmeldeformular. Also startet die
+    // Maske dann direkt im Anlegen-Modus. Anmelden bleibt genau einen Klick
+    // entfernt (Wechsel-Knopf), fuer alle mit Konto auf einem anderen Geraet
+    // oder nach geleertem Browserspeicher.
+    var ersterBesuch = false;   // KLON: kein Anlegen-Modus
+    modusSetzen(false);
+    // Im Anlegen-Modus ist das Veranstaltungs-Passwort das erste leere Feld.
+    (ersterBesuch ? lanFeld : (nickFeld.value ? input : nickFeld)).focus();
+  }
+
+  function schliesseGate() {
+    gate.hidden = true;
+    zielTab = null;
+  }
+
+  function fehler(text) {
+    msg.style.color = '#c0392b';
+    msg.textContent = text;
+    btn.disabled = false;
+  }
+
+  function pruefe() {
+    var nick = nickFeld.value.trim();
+    var pw = input.value;
+    if (!nick) return fehler('Bitte gib deinen Namen ein.');
+    if (!pw) return fehler('Bitte gib dein Passwort ein.');
+    if (modusNeu && !lanFeld.value) return fehler('Bitte gib das Passwort der Veranstaltung ein.');
+
+    btn.disabled = true;
+    msg.style.color = '#5a6b82';
+    msg.textContent = modusNeu ? 'Lege an …' : 'Prüfe …';
+
+    var koerper = modusNeu
+      ? {
+          action: 'konto-anlegen',
+          lanPasswort: lanFeld.value,
+          nickname: nick,
+          passwort: pw,
+          // Leer lassen ist der Normalfall; nur der Veranstalter traegt hier etwas ein.
+          veranstalterPasswort: veranstalterFeld.value || undefined,
+        }
+      : { action: 'konto-login', nickname: nick, passwort: pw };
+
+    fetch(GATEWAY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(koerper)
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (b) {
+        if (resp.ok && b.ok && b.token) {
+          var konto = { nickname: b.nickname, token: b.token, admin: !!b.admin, streamer: !!b.streamer, orga: !!b.orga, discordId: b.discordId || '' };
+          kontoSchreiben(konto);
+          kontoAnzeigen(konto);
+          // ⚠️ Falsches Veranstalter-Passwort beim Anlegen: der Server legt still
+          // ein normales Konto an (das Konto ist ja gewollt). Ohne diesen Satz
+          // merkte man es nur am 👤 statt ⭐ in der Kopfzeile. Die Prüfung steht
+          // im Client, damit sie mit jeder Worker-Fassung greift.
+          if (modusNeu && veranstalterFeld.value && !b.admin) {
+            window.alert('Dein Konto ist angelegt – aber das Veranstalter-Passwort stimmte nicht. Du bist als normale:r Teilnehmer:in angemeldet. Brauchst du Veranstalter-Rechte, kann dir jemand aus der Orga in der Kontenliste den 🛠-Haken setzen.');
+          }
+          msg.style.color = '#5a6b82';
+          msg.textContent = 'Einen Moment …';
+          freigeben(function () { discordErinnern(konto); });
+          return;
+        }
+        // Die Meldung des Workers ist die genauere – eine eigene nur, wenn keine da ist.
+        fehler(b.error || ('Es hat nicht geklappt (HTTP ' + resp.status + ').'));
+        // 409 heißt "Name vergeben" – dann liegt das Problem beim Namen, sonst beim Passwort.
+        if (resp.status === 409) nickFeld.select();
+        else input.select();
+      });
+    }).catch(function () {
+      // Häufigster Grund ist nicht "kein Netz", sondern eine Adresse, die der
+      // Worker nicht kennt (CORS) – etwa ein anderer localhost-Port oder eine
+      // direkt geöffnete Datei. Deshalb die eigene Herkunft mit anzeigen, sonst
+      // ist das von außen nicht zu unterscheiden.
+      msg.style.color = '#c0392b';
+      msg.innerHTML = 'Keine Verbindung zum Server.<br><span style="font-size:11px;opacity:.8">Aufgerufen von: ' +
+        String(window.location.origin || 'unbekannt').replace(/[<>&"]/g, '') + '</span>';
+      btn.disabled = false;
+    });
+  }
+
+  // --- Mein Konto: die Discord-ID -------------------------------------------
+  var kontoGate   = document.getElementById('konto-gate');
+  var kdFeld      = document.getElementById('konto-discord');
+  var kdMsg       = document.getElementById('konto-msg');
+  var kdSpeichern = document.getElementById('konto-btn-speichern');
+  var kdTest      = document.getElementById('konto-btn-test');
+  var kdTestText  = document.getElementById('konto-test-hinweis');
+
+  // Dieselbe Regel wie im Worker: reine Ziffern, 17 bis 20 Stellen.
+  // ⚠️ Sie ERSETZT die Prüfung dort nicht - sie sagt nur früher Bescheid,
+  // ohne dass jemand erst auf den Server warten muss.
+  var DISCORD_ID_RE = /^[0-9]{17,20}$/;
+
+  function kdMelden(text, istFehler) {
+    kdMsg.style.color = istFehler ? '#c0392b' : '#5a6b82';
+    kdMsg.textContent = text;
+  }
+
+  // Den Test gibt es nur, wenn eine ID auch wirklich GESPEICHERT ist. Er prüft
+  // den Stand im Konto, nicht den im Feld - sonst bestätigte er eine Zahl, die
+  // noch gar nicht abgelegt ist.
+  function kdTestZeigen(gespeichert) {
+    kdTest.hidden = !gespeichert;
+    kdTestText.hidden = !gespeichert;
+  }
+
+  function oeffneKonto(alsErinnerung) {
+    var k = kontoLesen();
+    if (!k || !k.nickname) return;
+    document.getElementById('konto-wer').textContent = 'Angemeldet als ' + k.nickname;
+    kdFeld.value = k.discordId || '';
+    kdMelden('', false);
+    kdTestZeigen(k.discordId);
+    // Der Kasten gehoert zum EINEN Aufruf, nicht zum Dialog: wer den Dialog
+    // danach selbst oeffnet, soll nicht wieder angetextet werden.
+    var erKasten = document.getElementById('konto-erinnerung');
+    if (erKasten) erKasten.hidden = !alsErinnerung;
+    kontoGate.hidden = false;
+    kdFeld.focus();
+  }
+
+  // --- Nach der Anmeldung an die Discord-ID erinnern ------------------------
+  // ⚠️ Die ID ist freiwillig, aber ohne sie bekommt niemand die Nachricht
+  // „dein Essen liegt bereit" - und das faellt erst auf, wenn das Essen kalt
+  // ist. Der gelbe Punkt am Namen war bisher der einzige Hinweis: er erklaert
+  // nichts und wird uebersehen. Also geht der Konto-Dialog nach der Anmeldung
+  // einmal von selbst auf.
+  var ERINNERT_KEY = 'agelan_discord_erinnert';
+  function discordErinnern(konto) {
+    if (!konto || konto.discordId) return;   // hat schon eine ID
+    // ⚠️ Der Merker haengt am NAMEN, nicht nur am Browser. Auf einer LAN teilen
+    // sich mehrere Leute denselben Rechner - ein reiner Browser-Merker haette
+    // allen nach dem Ersten die Erinnerung verschluckt.
+    try {
+      if (localStorage.getItem(ERINNERT_KEY) === konto.nickname) return;
+      localStorage.setItem(ERINNERT_KEY, konto.nickname);
+    } catch (e) { /* privater Modus: dann eben bei jeder Anmeldung */ }
+    oeffneKonto(true);
+  }
+
+  function schliesseKonto() { kontoGate.hidden = true; }
+
+  // Ein Aufruf an den Worker, der immer denselben Weg nimmt: Knopf sperren,
+  // melden, wieder entsperren. ⚠️ Ohne das gemeinsame Entsperren am Ende
+  // bliebe ein Knopf nach einem Netzfehler für immer gesperrt.
+  function kdRufe(knopf, koerper, beiErfolg) {
+    var k = kontoLesen();
+    if (!k || !k.token) return kdMelden('Du bist nicht mehr angemeldet.', true);
+    koerper.token = k.token;
+    knopf.disabled = true;
+    fetch(GATEWAY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(koerper)
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (b) {
+        if (resp.ok && b.ok) beiErfolg(b, k);
+        else kdMelden(b.error || ('Es hat nicht geklappt (HTTP ' + resp.status + ').'), true);
+      });
+    }).catch(function () {
+      kdMelden('Keine Verbindung zum Server.', true);
+    }).then(function () { knopf.disabled = false; });
+  }
+
+  function kdSpeichernTun() {
+    var wert = kdFeld.value.trim();
+    // ⚠️ Fast jede:r tippt beim ersten Mal seinen Discord-NAMEN hier hinein.
+    // Deshalb sagt die Meldung nicht bloss "falsch", sondern wohin man schauen
+    // muss - die Klickfolge steht gleich darüber zum Aufklappen.
+    if (wert && !DISCORD_ID_RE.test(wert)) {
+      return kdMelden('Das ist keine Discord-ID. Gemeint ist nicht dein Discord-Name, sondern eine lange Zahl aus 17 bis 20 Ziffern. Wie du sie findest, steht oben unter „Wo finde ich die?“.', true);
+    }
+    kdMelden('Speichere …', false);
+    kdRufe(kdSpeichern, { action: 'konto-discord', discordId: wert }, function (b, k) {
+      k.discordId = b.discordId || '';
+      kontoSchreiben(k);
+      kontoAnzeigen(k);
+      kdFeld.value = k.discordId;
+      kdTestZeigen(k.discordId);
+      // Erledigt: die Aufforderung hat sich mit dem Speichern erledigt und
+      // stuende sonst weiter ueber einem gefuellten Feld.
+      var erKasten = document.getElementById('konto-erinnerung');
+      if (erKasten && k.discordId) erKasten.hidden = true;
+      kdMelden(k.discordId
+        ? 'Gespeichert. Schick dir jetzt eine Testnachricht – erst dann weißt du sicher, dass die ID stimmt.'
+        : 'Gespeichert. Du hast jetzt keine Discord-ID hinterlegt und bekommst keine Nachricht.', false);
+    });
+  }
+
+  function kdTestTun() {
+    kdMelden('Schicke …', false);
+    kdRufe(kdTest, { action: 'discord-test' }, function () {
+      kdMelden('Ist raus. Schau in Discord nach. Kommt nichts an, gehört die ID jemand anderem – oder deine Direktnachrichten sind zu.', false);
+    });
+  }
+
+  kdSpeichern.addEventListener('click', kdSpeichernTun);
+  kdTest.addEventListener('click', kdTestTun);
+  document.getElementById('konto-zurueck').addEventListener('click', schliesseKonto);
+  kontoGate.addEventListener('click', function (e) { if (e.target === kontoGate) schliesseKonto(); });
+  kdFeld.addEventListener('keydown', function (e) { if (e.key === 'Enter') kdSpeichernTun(); });
+  var kopfKonto = document.getElementById('kopf-konto');
+  // ⚠️ Nicht `addEventListener('click', oeffneKonto)`: dann waere das
+  // MouseEvent das Argument `alsErinnerung` - und immer truthy. Der
+  // Erinnerungskasten stuende bei jedem Klick auf den Namen mit da.
+  if (kopfKonto) kopfKonto.addEventListener('click', function () { oeffneKonto(false); });
+
+  // --- QR zum Herumzeigen ---------------------------------------------------
+  var qrGate    = document.getElementById('qr-gate');
+  var qrFlaeche = document.getElementById('qr-flaeche');
+  var qrAdrEl   = document.getElementById('qr-adresse');
+  var qrLaeuft  = false;
+
+  // \u26a0\ufe0f Beim Entwickeln steht hier localhost. Ein QR darauf f\u00fchrt am Handy ins
+  // Leere - und das merkt man erst, wenn jemand davorsteht und scannt.
+  function qrAdresse() {
+    var o = String(location.origin || '');
+    if (!o || o.indexOf('localhost') >= 0 || o.indexOf('127.0.0.1') >= 0 || o.indexOf('file:') === 0) {
+      return 'https://tecko1985.github.io/agelan/';
+    }
+    return o + location.pathname;
+  }
+
+  // Die Bibliothek kommt erst beim ersten Klick, nicht beim Seitenstart: sie
+  // wird selten gebraucht und soll den Aufbau nicht aufhalten.
+  function qrLade() {
+    if (window.qrcode) return Promise.resolve(true);
+    return new Promise(function (fertig) {
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+      s.onload = function () { fertig(!!window.qrcode); };
+      s.onerror = function () { fertig(false); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function oeffneQr() {
+    var adresse = qrAdresse();
+    qrAdrEl.textContent = adresse;
+    qrGate.hidden = false;
+    if (qrFlaeche.getAttribute('data-fuer') === adresse) return;   // schon gezeichnet
+    qrFlaeche.textContent = 'Einen Moment \u2026';
+    if (qrLaeuft) return;
+    qrLaeuft = true;
+    qrLade().then(function (da) {
+      qrLaeuft = false;
+      if (!da) {
+        // Kein Drama: die Adresse steht darunter und ist abtippbar.
+        qrFlaeche.textContent = 'Das Bild l\u00e4sst sich gerade nicht laden. Die Adresse steht darunter.';
+        return;
+      }
+      try {
+        // Typ 0 = kleinste passende Gr\u00f6\u00dfe, "M" = mittlere Fehlerkorrektur.
+        var qr = window.qrcode(0, 'M');
+        qr.addData(adresse);
+        qr.make();
+        // Als SVG statt als Bild: skaliert ohne Treppen, egal wie gro\u00df der
+        // Dialog gerade ist.
+        qrFlaeche.innerHTML = qr.createSvgTag({ scalable: true, margin: 1 });
+        qrFlaeche.setAttribute('data-fuer', adresse);
+      } catch (e) {
+        qrFlaeche.textContent = 'Der Code lie\u00df sich nicht erzeugen. Die Adresse steht darunter.';
+      }
+    });
+  }
+
+  function schliesseQr() { qrGate.hidden = true; }
+
+  var qrKnopf = document.getElementById('nav-qr');
+  if (qrKnopf) qrKnopf.addEventListener('click', oeffneQr);
+  document.getElementById('qr-zurueck').addEventListener('click', schliesseQr);
+  qrGate.addEventListener('click', function (e) { if (e.target === qrGate) schliesseQr(); });
+
+  // --- Verdrahtung ----------------------------------------------------------
+  Array.prototype.forEach.call(document.querySelectorAll('[data-hub-ziel]'), function (k) {
+    k.addEventListener('click', function () { oeffneBereich(k.getAttribute('data-hub-ziel')); });
+  });
+  btn.addEventListener('click', pruefe);
+  // KLON: Konten entstehen auf der Website, nicht hier.
+  wechsel.addEventListener('click', function () { window.open(WEBSITE + '#/konto', '_blank', 'noopener'); });
+  [nickFeld, lanFeld, input, veranstalterFeld].forEach(function (f) {
+    f.addEventListener('keydown', function (e) { if (e.key === 'Enter') pruefe(); });
+  });
+  zurueck.addEventListener('click', schliesseGate);
+  gate.addEventListener('click', function (e) { if (e.target === gate) schliesseGate(); });
+
+  // Der Titel in der Kopfzeile führt zurück aufs Dashboard – erst wenn man
+  // angemeldet ist, denn vorher IST das Dashboard schon zu sehen.
+  var kopfTitel = document.getElementById('kopf-titel');
+  if (kopfTitel) {
+    kopfTitel.addEventListener('click', function () { if (frei) zeigeHub(); });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!qrGate.hidden) { schliesseQr(); return; }
+    if (!kontoGate.hidden) { schliesseKonto(); return; }
+    if (!gate.hidden) { schliesseGate(); return; }
+    // Das Dashboard lässt sich nur schließen, wenn dahinter auch etwas liegt.
+    if (frei && hub && !hub.hidden) versteckeHub();
+  });
+
+  // --- Start ----------------------------------------------------------------
+  // Liegt eine Anmeldung vor, wird sie beim Server gegengeprüft: ein gelöschtes
+  // Konto (etwa nach "alle Konten leeren") darf mit altem Token nicht weiterlaufen.
+  // ⚠️ Bei einem NETZfehler wird trotzdem freigegeben. Wer sich einmal angemeldet
+  // hat, darf nicht ausgesperrt werden, weil gerade die Leitung hakt – die
+  // Firebase-Daten sind ohnehin nicht durch dieses Konto geschützt.
+  var konto = kontoLesen();
+  if (konto && konto.token) {
+    kontoAnzeigen(konto);
+    fetch(GATEWAY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'konto-pruefen', token: konto.token })
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (b) {
+        return { status: resp.status, httpOk: resp.ok, b: b };
+      });
+    }).then(function (r) {
+      var b = r.b;
+      if (b && b.ok) {
+        // ⚠️ Name UND Veranstalter-Stand kommen frisch vom Server: ein entzogenes
+        // Recht muss sofort wirken, nicht erst wenn das Token in 120 Tagen abläuft.
+        // Schickt der Server ein neues Token mit, ersetzt es das alte.
+        // ⚠️ Auf `typeof === "string"` geprüft statt blind `|| ""` genommen:
+        // solange der Worker noch die alte Fassung ist, schickt er gar kein
+        // Feld mit - ein blindes Nehmen würde eine eingetragene ID beim
+        // nächsten Start stillschweigend weglöschen. Nur ein wirklich
+        // gesendeter Wert zählt.
+        var idNeu = typeof b.discordId === 'string' ? b.discordId : null;
+        var geaendert = (b.nickname && b.nickname !== konto.nickname)
+          || !!b.admin !== !!konto.admin
+          || !!b.streamer !== !!konto.streamer
+          || !!b.orga !== !!konto.orga
+          || (idNeu !== null && idNeu !== (konto.discordId || ''));
+        if (geaendert || b.token) {
+          if (b.nickname) konto.nickname = b.nickname;
+          konto.admin = !!b.admin;
+          konto.streamer = !!b.streamer;
+          konto.orga = !!b.orga;
+          if (idNeu !== null) konto.discordId = idNeu;
+          if (b.token) konto.token = b.token;
+          kontoSchreiben(konto);
+          kontoAnzeigen(konto);
+        }
+        freigeben();
+      } else if (r.httpOk && b && b.ok === false) {
+        // Konto gibt es nicht mehr: Anmeldung wegräumen, Vorraum zeigen.
+        // ⚠️ NUR bei der ausdrücklichen Antwort {ok:false} (200). Ein 5xx, eine
+        // Fehlerseite von Cloudflare oder ein 429 heißt „Server gerade nicht
+        // da“, nicht „Konto weg“ – dann gilt dasselbe wie beim Netzfehler unten.
+        kontoSchreiben(null);
+        kontoAnzeigen(null);
+      } else {
+        freigeben();
+      }
+    }).catch(function () {
+      freigeben();
+    });
+  }
+})();
+</script>
+
+<script>
+// Die Karte „Funktionen“ im Vorraum: was die App kann, nach Themen geordnet.
+//
+// ⚠️ Sie steht bewusst HIER und nicht in app.js. Der Vorraum ist die einzige
+// Stelle, die jede:r VOR der Anmeldung sieht – app.js wird aber erst nach der
+// Freigabe nachgeladen. Eine Liste aus app.js bliebe im Vorraum leer.
+//
+// Hier steht der Zustand, nicht die Änderung: keine Versionsnummern, kein
+// „neu“, kein „jetzt“. Die Historie liegt in APP_CHANGELOG in app.js und wird
+// dort weitergepflegt; angezeigt wird sie seit 07.09.2026 nicht mehr.
+//
+// Gesetzt wird der Text mit textContent, nicht mit innerHTML: escapeHtml() aus
+// app.js steht an dieser Stelle noch nicht bereit.
+(function () {
+  var FUNKTIONEN = [
+    { title: "Was die AgeLan-Seite ist", items: [
+        "Alles zur LAN an einem Ort: Turniere, Sendeplan, Frühstück und warmes Essen.",
+        "Jede:r legt sich ein eigenes Konto mit Namen und Passwort an; ein gemeinsames Passwort gibt es nicht.",
+        "Der Vorraum mit den fünf Kacheln ist die Übersicht — der Titel oben links führt jederzeit dorthin zurück."
+    ]},
+    { title: "Turnier", items: [
+        "Mehrere Turniere laufen nebeneinander; die Liste zeigt, was gerade offen ist.",
+        "Angelegt werden sie vom Veranstalter. Alle anderen schreiben sich ein, tragen ihr 1vs1-Elo ein und warten in der Lobby.",
+        "Ergebnisse meldet man selbst — Sätze eintippen, fertig. Tabelle und K.-o.-Baum rechnen sich daraus.",
+        "Wer nicht mitspielt, kann auch nur zuschauen."
+    ]},
+    { title: "Stream", items: [
+        "Ein Sendeplan über alle Tage der Veranstaltung: wer sendet wann vom Kanal.",
+        "Mehrere dürfen sich dieselbe Zeit vormerken — der Plan sammelt Absichten, wer wirklich sendet, klärt ihr untereinander.",
+        "Eintragen darf, wer dafür freigeschaltet ist; alle anderen lesen den Plan.",
+        "Zeiten nach Mitternacht sind mit „(Nacht)“ gekennzeichnet und gehören noch zum Tag davor."
+    ]},
+    { title: "Frühstück", items: [
+        "Pakete für den nächsten Morgen, bestellt wird am Abend vorher.",
+        "Jeder Morgen hat einen Bestellschluss; danach wird eingekauft und es geht nichts mehr.",
+        "Bestellt wird für sich selbst — die Sammelliste sieht der Veranstalter."
+    ]},
+    { title: "Essen", items: [
+        "Warmes Essen vom Lieferanten: Karte ansehen, Essen zusammenstellen, vorne bezahlen, abholen.",
+        "Sonderwünsche lassen sich je Gericht mitgeben.",
+        "Aus allen Bestellungen wird eine Sammelbestellung an den Lieferanten."
+    ]},
+    { title: "Downloads", items: [
+        "Werkzeuge zum Herunterladen für die Veranstaltung, z. B. der Klickzähler fürs 2vs2-Coop-Turnier."
+    ]},
+    { title: "Mein Konto", items: [
+        "Oben rechts steht der eigene Name; ein Tipp darauf öffnet „Mein Konto“.",
+        "Freiwillig ist die Discord-Benutzer-ID: mit ihr schickt der AgeLan-Bot eine Nachricht, sobald das Essen bereitliegt. Ohne ID fragt man selbst nach.",
+        "Ein gelber Punkt am Namen heißt: es ist noch keine Discord-ID hinterlegt.",
+        "Die ID lässt sich jederzeit wieder leeren; eintragen kann sie nur die Person selbst."
+    ]},
+    { title: "Für Veranstalter", items: [
+        "Der Reiter „Einstellungen“ ist nur für Veranstalter sichtbar und zeigt alle angemeldeten Konten.",
+        "Das Häkchen 🛠 nimmt jemanden in die Organisation auf — dieselben Rechte wie der Veranstalter, und beim Essen zahlt die Person nichts. Das Häkchen 🎥 gibt den Streamplan zum Eintragen frei.",
+        "Mit ⭐ oder 🛠 schaltet sich die Verwaltung von Turnier, Stream, Frühstück und Essen über das Konto frei, ohne PIN. Wo das (noch) nicht klappt, steht es im Kasten „Veranstalter“ — dann geht es mit dem PIN des Bereichs; das Gerät, das einen Bereich angelegt hat, braucht keinen.",
+        "Nach der Veranstaltung löscht ein Knopf ALLE Konten, auch das eigene. Das ist nicht umkehrbar.",
+        "Der QR-Knopf in der Reiterleiste zeigt einen Code auf genau diese Seite — den darf jede:r herumzeigen."
+    ]},
+    { title: "Grenzen", items: [
+        "Die Seite gehört zu einer privaten Veranstaltung, nicht zum Verein.",
+        "Bestellungen und Pläne liegen in der Firebase-Datenbank und hängen nicht am Konto: „Konto löschen“ räumt sie nicht mit weg.",
+        "Wer die Adresse der Datenbank kennt, kann die Einträge technisch auch ohne Anmeldung lesen.",
+        "Nach dem Ende der Veranstaltung werden die Konten gelöscht; für die nächste AgeLan legt jede:r ein neues an."
+    ]}
+  ];
+
+  var ziel = document.getElementById("funktionen-list");
+  if (!ziel) return;
+  FUNKTIONEN.forEach(function (gruppe) {
+    var block = document.createElement("div");
+    block.className = "changelog-group";
+    var titel = document.createElement("div");
+    titel.className = "cg-title";
+    titel.textContent = gruppe.title;
+    block.appendChild(titel);
+    var liste = document.createElement("ul");
+    liste.className = "cg-items";
+    gruppe.items.forEach(function (punkt) {
+      var zeile = document.createElement("li");
+      zeile.textContent = punkt;
+      liste.appendChild(zeile);
+    });
+    block.appendChild(liste);
+    ziel.appendChild(block);
+  });
+})();
+</script>
+</body>
+</html>

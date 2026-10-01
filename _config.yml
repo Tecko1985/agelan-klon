@@ -1,0 +1,27 @@
+# Nicht ausliefern.
+#
+# Die Repos sind privat, die Pages-Seite ist es NICHT: jede Datei im
+# ausgelieferten Ordner ist fuer jeden im Internet abrufbar. Pruefstaende,
+# Schema-Dateien und Node-Skripte gehoeren nicht dazu.
+#
+# ⚠️ Hier NUR eintragen, was keine Seite und kein Skript der App laedt.
+# Ein Web Worker (besprechung/transcribe-worker.js) wird vom Browser geholt
+# und muss ausgeliefert bleiben.
+#
+# Angelegt bei der Abnahme am 17.09.2026.
+exclude:
+  - "pflege/pruefe-live-pin.mjs"
+  - "pflege/pruefe-pin-beweis.mjs"
+  - "pflege/pruefe-plan-pin.mjs"
+  - "pflege/pruefe-spuren.mjs"
+  - "pflege/ziehe-pin-um.mjs"
+  - "pruefe-zeitplan.mjs"
+  - "worker.js"
+  - "database.rules.json"
+  # Nachgetragen 21.09.2026: Node-Pruefstand der Rules, keine Seite laedt ihn.
+  - "pflege/pruefe-rules.js"
+  # Nachgetragen 26.09.2026 (Abnahme 25.09.e E5): Rechte-Pruefstand, keine Seite laedt ihn.
+  - "pflege/pruefe-rechte.js"
+  # Einrichtungsnotiz, nachgetragen 26.09.2026 (Abnahme 25.09.e A-17) - keine Seite laedt sie,
+  # Jekyll lieferte sie zusaetzlich als FIREBASE-SETUP.html aus.
+  - "FIREBASE-SETUP.md"

@@ -1,0 +1,757 @@
+// ===========================================================================
+// fruehstueck-app.js – Screens, Rendering, Events für die Frühstücksbestellung.
+// Redet nur über fruehstueckService. escapeHtml() kommt aus app.js (globaler
+// Scope) – Namen, Paketnamen, Beschreibungen und Notizen sind Firebase-Fremd-
+// eingaben und werden vor jedem innerHTML damit escaped.
+// ===========================================================================
+
+let frZustand = null;
+let frAktiverTag = null;          // Datum des gerade angezeigten Morgens
+let frEntwurf = null;             // { positionen:{pid:anzahl}, notiz } – laufende Bestellung vor dem Speichern
+let frBearbeitetesPaketId = null; // null = "Neues Paket"-Formular legt an, sonst bearbeitet es dieses Paket
+// Welche Einstellungsfelder (Morgen/Bestellschluss) hat der Veranstalter
+// geändert, ohne zu speichern? Diese fasst kein Live-Update mehr an – sonst
+// geht die Eingabe still verloren. Je Feld, siehe frRenderAdmin.
+const frEinstellungenBeruehrt = new Set();
+// ⚠️ Wer beim Kassieren eine Zeile abhakt, loest ein Live-Update aus und die
+// Liste wird neu gezeichnet. Ohne dieses Merken klappte die Person dabei jedes
+// Mal wieder zu – genau bei der Taetigkeit, fuer die die Liste da ist.
+const frOffenePersonen = new Set();
+
+function frEl(id) {
+  return document.getElementById(id);
+}
+
+function frZeigeFehler(id, text) {
+  const el = frEl(id);
+  if (el) el.textContent = text || "";
+}
+
+// ⚠️ Dienstaufruf, der nie still scheitert: der Dienst liefert bei abgelehntem
+// Schreiben { erfolg:false, fehler }, und falls doch etwas wirft (Netz, Bug),
+// wird auch das zur Meldung statt zu einer verschluckten Ausnahme
+// (Bugjagd 01.10.2026).
+async function frRufe(aufruf) {
+  try {
+    const res = await aufruf();
+    return res || { erfolg: false, fehler: "Speichern abgelehnt – keine Antwort erhalten. Bitte noch einmal versuchen." };
+  } catch (e) {
+    console.error("[Frühstück] Aufruf fehlgeschlagen:", e);
+    return { erfolg: false, fehler: "Speichern abgelehnt – " + ((e && e.message) || "unbekannter Fehler") + ". Bitte Verbindung prüfen und noch einmal versuchen." };
+  }
+}
+
+function frZeigeView(id) {
+  document.querySelectorAll("#tab-fruehstueck .sk-view").forEach((v) => v.classList.toggle("aktiv", v.id === id));
+}
+
+// Zeit "HH:MM" <-> Minuten seit 0:00. <input type="time"> liefert/braucht die
+// Textform; das Datenmodell rechnet in Minuten wie beim Streamkalender.
+// ⚠️ Leeres/halbes Zeitfeld liefert "" – die Aufrufer übergeben deshalb -1 als
+// Ersatz, damit der Dienst „Bitte wähle einen Bestellschluss." meldet. Mit
+// STANDARD_SCHLUSS als Ersatz wurde daraus still 20:00 (Bugjagd 01.10.2026).
+function frZeitInputWert(minuten) {
+  return fruehstueckService.zeitLabel(minuten);
+}
+function frMinutenAusZeitInput(wert, ersatz) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(wert || ""));
+  if (!m) return ersatz;
+  return Math.min(1439, Number(m[1]) * 60 + Number(m[2]));
+}
+
+// --- Hauptrender -------------------------------------------------------------
+function frRender(z) {
+  frZustand = z;
+  if (!z.vorhanden) {
+    frZeigeView("fr-kein-plan");
+    return;
+  }
+  frZeigeView("fr-plan");
+
+  frEl("fr-titel").textContent = z.meta.titel;
+  frEl("fr-zeitraum").textContent = z.tage.length
+    ? fruehstueckService.datumLabel(z.tage[0].datum, true) + (z.tage.length > 1 ? " – " + fruehstueckService.datumLabel(z.tage[z.tage.length - 1].datum, true) : "")
+    : "";
+
+  // Aktiven Tag festlegen: der zuletzt gewählte, sonst der erste noch offene,
+  // sonst einfach der erste Morgen des Plans.
+  if (!frAktiverTag || !z.tage.some((t) => t.datum === frAktiverTag)) {
+    // ⚠️ Bei zugedrehtem Schalter ist kein Tag `offen` – dann nicht auf tage[0]
+    // (oft ein schon vergangener Morgen) springen, sondern auf den ersten, dessen
+    // Bestellschluss noch kommt (Bugjagd 01.10.2026).
+    const offener = z.tage.find((t) => t.offen) || z.tage.find((t) => t.zeitOffen);
+    // ⚠️ Fällt der gewählte Morgen weg (Veranstalter kürzt), gehört der Entwurf
+    // nicht auf den nächsten Morgen – sonst wurde er dort still bestellt. Wie
+    // beim Tag-Chip: neuer Morgen, neuer Entwurf (Bugjagd 25.09.d T5b).
+    if (frAktiverTag) frEntwurf = null;
+    frAktiverTag = (offener || z.tage[0] || {}).datum || null;
+  }
+
+  // ⚠️ Der Stand gehört ganz nach oben. Wer den Reiter aufmacht und nichts
+  // anklicken kann, soll den Grund sehen, ohne erst zu einem Tag zu scrollen.
+  const stand = frEl("fr-annahme-stand");
+  if (stand) {
+    stand.textContent = z.schalterAn ? "" : "Geschlossen – gerade werden keine Bestellungen angenommen.";
+    stand.classList.toggle("zu", !z.schalterAn);
+  }
+
+  frRenderChips(z);
+  frRenderTagInhalt(z);
+  frRenderAdmin(z);
+}
+
+function frRenderChips(z) {
+  const box = frEl("fr-tagchips");
+  box.innerHTML = z.tage.map((t) => `
+    <button class="sk-chip${t.datum === frAktiverTag ? " aktiv" : ""}" data-datum="${t.datum}">
+      ${escapeHtml(t.label)}${t.offen ? "" : " · zu"}
+    </button>`).join("");
+  box.querySelectorAll("button[data-datum]").forEach((b) => {
+    b.addEventListener("click", () => frWechsleTag(z, b.dataset.datum));
+  });
+}
+
+// Zu einem anderen Morgen wechseln – über die Tag-Knöpfe oder die Pfeile ‹ ›
+// in der Tageskarte (Michel am 01.10.2026: „auch schon für Samstag bestellen“).
+// ⚠️ Ein angefangener, nicht gespeicherter Entwurf gehört zu SEINEM Morgen –
+// vorher fragen, statt ihn still wegzuwerfen.
+function frWechsleTag(z, datum) {
+  if (!datum || datum === frAktiverTag) return;
+  if (frEntwurf && frEntwurf.beruehrt &&
+      !confirm("Deine Änderung für diesen Morgen ist noch nicht gespeichert. Trotzdem zum anderen Tag wechseln?")) return;
+  frAktiverTag = datum;
+  frEntwurf = null;
+  frRenderChips(z);
+  frRenderTagInhalt(z);
+}
+
+// Kurzform des gespeicherten Standes. Damit laesst sich erkennen, ob sich die
+// Bestellung in Firebase geaendert hat, seit der Entwurf gebaut wurde.
+function frBestellSchluessel(b) {
+  if (!b) return "";
+  return b.positionen.map((p) => p.paketId + ":" + p.anzahl).sort().join("|") + "#" + (b.notiz || "");
+}
+
+// Der Name des angemeldeten Kontos, falls eines da ist. Sonst leer - dann
+// greift wie bisher das Eingabefeld.
+function frFesterName() {
+  try {
+    const k = window.__AGELAN_KONTO__;
+    return (k && k.nickname) || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function frStarteEntwurf(tag) {
+  const positionen = {};
+  (tag.meineBestellung ? tag.meineBestellung.positionen : []).forEach((p) => { positionen[p.paketId] = p.anzahl; });
+  frEntwurf = {
+    positionen,
+    notiz: tag.meineBestellung ? tag.meineBestellung.notiz : "",
+    // Erst wenn jemand wirklich etwas angefasst hat, ist der Entwurf schuetzenswert.
+    beruehrt: false,
+    stand: frBestellSchluessel(tag.meineBestellung),
+  };
+}
+
+// ⚠️ Der Entwurf darf eine laufende Eingabe nicht ueberschreiben – er darf aber
+// auch nicht auf einem veralteten Stand haengen bleiben. Genau das ist passiert:
+// beim ersten Rendern stand die anonyme Firebase-Kennung noch nicht fest, die
+// eigene Bestellung galt als "nicht vorhanden", der Entwurf wurde leer gebaut
+// und zog danach nie nach. Wer schon bestellt hatte, sah lauter Nullen – und
+// "Bestellung aktualisieren" haette sie geloescht.
+function frEntwurfAuffrischen(tag) {
+  if (!frEntwurf) { frStarteEntwurf(tag); return; }
+  if (frEntwurf.beruehrt) return;                    // jemand tippt gerade
+  const jetzt = frBestellSchluessel(tag.meineBestellung);
+  if (jetzt !== frEntwurf.stand) frStarteEntwurf(tag);
+}
+
+function frRenderTagInhalt(z) {
+  const box = frEl("fr-tag-inhalt");
+  const tag = z.tage.find((t) => t.datum === frAktiverTag);
+  if (!tag) { box.innerHTML = ""; return; }
+
+  frEntwurfAuffrischen(tag);
+
+  const bearbeitbar = tag.offen || z.istAdmin;
+  // ⚠️ Bezahlt friert die Menge ein – das lehnt der Dienst ohnehin ab
+  // (FR_SCHON_BEZAHLT). Stepper und Stornieren gar nicht erst anbieten, sonst
+  // steht nach der Ablehnung die ungespeicherte Menge neben „gespeichert“
+  // (Bugjagd 25.09.d T5b-4). Die Notiz bleibt änderbar, solange der Betrag gleich ist.
+  const bezahltFest = !!(tag.meineBestellung && tag.meineBestellung.bezahlt);
+  const stepperAn = bearbeitbar && !bezahltFest;
+  // ⚠️ Unten steht bewusst tag.zeitOffen und nicht tag.offen: tag.offen
+  // enthält auch den Schalter des Veranstalters. Mit tag.offen stand bei
+  // zugedrehter Annahme bei JEDEM Morgen „Bestellschluss war", obwohl er erst
+  // am Abend kommt. Genau so gemessen, bevor es hier stand.
+  const stueckGesamt = Object.values(frEntwurf.positionen).reduce((s, n) => s + (n || 0), 0);
+  // ⚠️ Solange am Entwurf nichts geändert ist, zeigt die Karte den BELEG
+  // (meineBestellung.summeCent), nicht Menge × heutiger Paketpreis. Sonst stand
+  // nach einer Preisänderung „2 Stück 6,00 €“ neben „Deine Bestellung ist
+  // gespeichert“, während Abrechnung und Kasse 5,00 € sagen (Bugjagd 25.09.d
+  // T5b-1). Wer etwas ändert, bestellt neu – dann gilt der heutige Preis.
+  const meine = tag.meineBestellung;
+  const summeCent = meine && !frEntwurf.beruehrt
+    ? meine.summeCent
+    : z.pakete.reduce((s, p) => s + p.preisCent * (frEntwurf.positionen[p.id] || 0), 0);
+  const belegPreis = (pid) => {
+    const pos = meine ? meine.positionen.find((x) => x.paketId === pid) : null;
+    return pos ? pos.preisCent : null;
+  };
+  const preisGeaendert = !!meine && z.pakete.some((p) => belegPreis(p.id) !== null && belegPreis(p.id) !== p.preisCent);
+
+  const paketeHtml = z.pakete.length
+    ? z.pakete.map((p) => {
+        const anzahl = frEntwurf.positionen[p.id] || 0;
+        return `
+        <div class="fr-paket">
+          <div class="fr-paket-info">
+            <div class="fr-paket-name">${escapeHtml(p.name)}</div>
+            ${p.beschreibung ? `<div class="fr-paket-beschreibung">${escapeHtml(p.beschreibung)}</div>` : ""}
+            <div class="fr-paket-preis">${p.preisCent ? fruehstueckService.centLabel(p.preisCent) : "kostenlos"}${belegPreis(p.id) !== null && belegPreis(p.id) !== p.preisCent
+              ? ` <span class="fr-summe-leer">(bestellt zu ${fruehstueckService.centLabel(belegPreis(p.id))})</span>` : ""}</div>
+          </div>
+          <div class="fr-stepper">
+            <button type="button" data-fr-weniger="${p.id}" ${!stepperAn || anzahl <= 0 ? "disabled" : ""} title="Eins weniger" aria-label="Eins weniger von ${escapeHtml(p.name)}">−</button>
+            <span class="fr-stepper-zahl">${anzahl}</span>
+            <button type="button" data-fr-mehr="${p.id}" ${!stepperAn || anzahl >= fruehstueckService.MAX_STUECK ? "disabled" : ""} title="Eins mehr" aria-label="Eins mehr von ${escapeHtml(p.name)}">+</button>
+          </div>
+        </div>`;
+      }).join("")
+    : `<p class="fr-leer-hinweis">Noch keine Pakete angelegt.</p>`;
+
+  const eigeneAnzeige = tag.meineBestellung
+    ? `<p class="fr-eigene-hinweis">Deine Bestellung ist gespeichert${tag.meineBestellung.abgeholt ? " – als abgeholt markiert" : ""}${bezahltFest ? " und bezahlt" : ""}.</p>` +
+      (bezahltFest ? `<p class="hinweis-text">Bezahlt – Menge ändern oder stornieren geht erst, wenn der Veranstalter den Haken „bezahlt“ wieder herausnimmt.</p>` : "")
+    : "";
+
+  // ⚠️ Fokus und Cursor in Notiz/Name vor dem Neuzeichnen merken: der Takt
+  // und jede fremde Bestellung zeichnen diesen Kasten neu, und wer gerade
+  // tippte, flog aus dem Feld (Bugjagd 25.09.d T5b). Der Text selbst liegt
+  // ohnehin im Entwurf und kommt mit.
+  const aktiv = document.activeElement;
+  const fokusId = aktiv && (aktiv.id === "fr-best-notiz" || aktiv.id === "fr-best-name") ? aktiv.id : null;
+  let cursor = null;
+  if (fokusId) { try { cursor = [aktiv.selectionStart, aktiv.selectionEnd]; } catch (e) { cursor = null; } }
+
+  const tagIndex = z.tage.indexOf(tag);
+  const vorTag = z.tage[tagIndex - 1] || null;
+  const nachTag = z.tage[tagIndex + 1] || null;
+  const pfeil = (ziel, zeichen, richtung) => z.tage.length < 2 ? "" :
+    `<button type="button" class="fr-tag-pfeil" data-fr-tag="${ziel ? escapeHtml(ziel.datum) : ""}" ${ziel ? "" : "disabled"}
+      title="${ziel ? escapeHtml(richtung + ": " + ziel.tagLang + ", " + ziel.label) : "Kein " + (richtung === "Vorheriger Tag" ? "früherer" : "weiterer") + " Morgen"}"
+      aria-label="${escapeHtml(richtung)}">${zeichen}</button>`;
+
+  box.innerHTML = `
+    <div class="fr-tagkarte">
+      <div class="fr-tag-nav">
+        ${pfeil(vorTag, "‹", "Vorheriger Tag")}
+        <div class="fr-tag-nav-mitte">
+          <h3>${escapeHtml(tag.tagLang)}, ${escapeHtml(tag.label)}</h3>
+          <p class="fr-schluss${tag.vorbei ? " zu" : ""}">${tag.zeitOffen ? "Bestellschluss: " : "Bestellschluss war: "}${escapeHtml(tag.schlussLabel)}</p>
+        </div>
+        ${pfeil(nachTag, "›", "Nächster Tag")}
+      </div>
+
+      ${!bearbeitbar ? `<p class="hinweis-text">${tag.zeitOffen
+          ? "Geschlossen – der Veranstalter nimmt gerade keine Bestellungen an."
+          : "Für diesen Morgen ist der Bestellschluss vorbei."}</p>` : ""}
+
+      ${paketeHtml}
+
+      <div class="fr-summe-zeile">
+        <span>${stueckGesamt ? stueckGesamt + " Stück" : '<span class="fr-summe-leer">Nichts ausgewählt</span>'}</span>
+        <span>${summeCent ? fruehstueckService.centLabel(summeCent) : ""}</span>
+      </div>
+      ${preisGeaendert ? `<p class="hinweis-text">${frEntwurf.beruehrt
+          ? "Die Preise haben sich seit deiner Bestellung geändert. Mit „Bestellung aktualisieren“ gilt für alles der neue Preis – gespeichert sind " + fruehstueckService.centLabel(meine.summeCent) + "."
+          : "Die Preise haben sich seit deiner Bestellung geändert. Deine Bestellung gilt zum Preis von damals – änderst du sie, gilt der neue."}</p>` : ""}
+
+      ${bearbeitbar && z.pakete.length ? `
+        ${frFesterName()
+          // ⚠️ Angemeldet heißt: der Name steht fest. Ein Eingabefeld wäre nicht
+          // nur überflüssig, es ließe auch Bestellungen unter fremdem Namen zu –
+          // und genau der Name ist der Schlüssel der Abrechnung.
+          ? `<p class="fr-besteller">Bestellung für <b>${escapeHtml(frFesterName())}</b></p>`
+          : `<label class="feld-label" for="fr-best-name">Dein Name</label>
+             <input type="text" id="fr-best-name" class="eingabe" maxlength="40" autocomplete="off" value="${escapeHtml(frEntwurf.name != null ? frEntwurf.name : (tag.meineBestellung ? tag.meineBestellung.name : fruehstueckService.getGespeicherterName()))}">`}
+
+        <label class="feld-label" for="fr-best-notiz">Notiz (freiwillig)</label>
+        <input type="text" id="fr-best-notiz" class="eingabe" maxlength="200" autocomplete="off" value="${escapeHtml(frEntwurf.notiz || "")}">
+
+        <button class="btn btn-primary btn-grow" id="fr-btn-bestellen">${tag.meineBestellung ? "Bestellung aktualisieren" : "Bestellen"}</button>
+        ${tag.meineBestellung && !bezahltFest ? `<button class="btn btn-link" id="fr-btn-stornieren">Bestellung stornieren</button>` : ""}
+        <p class="hinweis-text fehler" id="fr-best-fehler"></p>
+      ` : ""}
+
+      ${eigeneAnzeige}
+
+      <p class="hinweis-text">${tag.anzahlBesteller ? tag.anzahlBesteller + " Person" + (tag.anzahlBesteller === 1 ? " hat" : "en haben") + " bestellt, " + tag.stueckGesamt + " Stück insgesamt." : "Noch niemand hat für diesen Morgen bestellt."}</p>
+    </div>
+
+    ${z.istAdmin ? frEinkaufslisteHtml(tag, z.pakete) + frBestellerlisteHtml(tag) : ""}
+  `;
+
+  box.querySelectorAll("[data-fr-tag]").forEach((b) => b.addEventListener("click", () => frWechsleTag(z, b.dataset.frTag)));
+  box.querySelectorAll("[data-fr-mehr]").forEach((b) => b.addEventListener("click", () => frAendereEntwurf(b.dataset.frMehr, 1)));
+  box.querySelectorAll("[data-fr-weniger]").forEach((b) => b.addEventListener("click", () => frAendereEntwurf(b.dataset.frWeniger, -1)));
+
+  const nameEl = frEl("fr-best-name");
+  if (nameEl) nameEl.addEventListener("input", () => { frEntwurf.name = nameEl.value; frEntwurf.beruehrt = true; });
+  const notizEl = frEl("fr-best-notiz");
+  if (notizEl) notizEl.addEventListener("input", () => { frEntwurf.notiz = notizEl.value; frEntwurf.beruehrt = true; });
+
+  const btnBestellen = frEl("fr-btn-bestellen");
+  if (btnBestellen) btnBestellen.addEventListener("click", () => frSpeichereBestellung(tag));
+  const btnStorno = frEl("fr-btn-stornieren");
+  if (btnStorno) btnStorno.addEventListener("click", () => frStorniereBestellung(tag));
+
+  frWireAbholButtons();
+
+  if (fokusId) {
+    const feld = frEl(fokusId);
+    if (feld) {
+      feld.focus();
+      if (cursor && cursor[0] != null) { try { feld.setSelectionRange(cursor[0], cursor[1]); } catch (e) { /* Feldart ohne Cursor */ } }
+    }
+  }
+}
+
+function frAendereEntwurf(paketId, delta) {
+  const bisher = frEntwurf.positionen[paketId] || 0;
+  const neu = Math.max(0, Math.min(fruehstueckService.MAX_STUECK, bisher + delta));
+  frEntwurf.positionen = Object.assign({}, frEntwurf.positionen, { [paketId]: neu });
+  frEntwurf.beruehrt = true;
+  frRenderTagInhalt(frZustand);
+}
+
+async function frSpeichereBestellung(tag) {
+  // Angemeldet: der Konto-Name gilt, egal was in einem Feld stehen könnte.
+  const name = frFesterName()
+    || (frEntwurf.name != null ? frEntwurf.name : (tag.meineBestellung ? tag.meineBestellung.name : fruehstueckService.getGespeicherterName()));
+  const res = await frRufe(() => fruehstueckService.bestelle(tag.datum, {
+    name,
+    positionen: frEntwurf.positionen,
+    notiz: frEntwurf.notiz || "",
+  }));
+  if (!res.erfolg) {
+    // Abgelehnt, weil inzwischen bezahlt: den Entwurf verwerfen, sonst steht
+    // nach dem nächsten Takt die abgelehnte Menge neben „gespeichert“.
+    const jetzt = fruehstueckService.getZustand();
+    const t = jetzt.vorhanden ? jetzt.tage.find((x) => x.datum === tag.datum) : null;
+    if (t && t.meineBestellung && t.meineBestellung.bezahlt) {
+      frEntwurf = null;
+      frNachSchreibenZeichnen();
+    }
+    frZeigeFehler("fr-best-fehler", res.fehler);
+    return;
+  }
+  frEntwurf = null;
+  frNachSchreibenZeichnen();
+}
+
+// ⚠️ Nach „Bestellen“/„Stornieren“ SOFORT neu zeichnen. Firebase meldet den
+// eigenen Schreibvorgang schon während set()/remove() an die Horcher – das
+// Neuzeichnen lief also, BEVOR frEntwurf hier auf null ging. Danach zeigten
+// Stepper und Felder auf einen Entwurf, den es nicht mehr gab: „+“ warf, eine
+// getippte Notiz war nach dem Takt weg, „Bestellung aktualisieren“ meldete
+// „keine Verbindung“, bis zu 30 s lang (Bugjagd 25.09.d T5b-3).
+function frNachSchreibenZeichnen() {
+  frRender(fruehstueckService.getZustand());
+}
+
+async function frStorniereBestellung(tag) {
+  if (!confirm("Deine Bestellung für " + tag.tagLang + " wirklich entfernen?")) return;
+  const res = await frRufe(() => fruehstueckService.storniere(tag.datum));
+  if (!res.erfolg) { frZeigeFehler("fr-best-fehler", res.fehler); return; }
+  frEntwurf = null;
+  frNachSchreibenZeichnen();
+}
+
+// --- Admin: Einkaufsliste + Bestellerliste je Tag ---------------------------
+function frEinkaufslisteHtml(tag, pakete) {
+  const zeilen = pakete
+    .map((p) => ({ name: p.name, anzahl: tag.gesamt[p.id] || 0 }))
+    .filter((z) => z.anzahl > 0);
+  if (!zeilen.length) return "";
+  return `
+    <div class="karte-block">
+      <p class="feld-label">Einkaufsliste – ${escapeHtml(tag.tagLang)}</p>
+      <div class="fr-einkaufsliste">
+        ${zeilen.map((z) => `<div class="fr-einkauf-zeile"><span>${escapeHtml(z.name)}</span><b>${z.anzahl}×</b></div>`).join("")}
+      </div>
+    </div>`;
+}
+
+// ⚠️ Seit 2026-10-01 OHNE „abgeholt“/„bezahlt“ und ohne Abrechnung: das
+// Frühstück läuft auf Vertrauensbasis, gebraucht wird nur die Menge (Michel).
+// frAbrechnungHtml und die Dienstfunktionen setzeAbgeholt/setzeBezahlt bleiben
+// stehen, werden aber nicht mehr aufgerufen. Die Sperre „bezahlt = nicht mehr
+// änderbar“ in Dienst und Regeln greift damit nie – niemand setzt den Haken.
+function frBestellerlisteHtml(tag) {
+  if (!tag.bestellungen.length) return "";
+  return `
+    <div class="karte-block">
+      <p class="feld-label">Bestellungen – ${escapeHtml(tag.tagLang)}</p>
+      ${tag.bestellungen.map((b) => `
+        <div class="fr-liste-eintrag">
+          <div style="flex:1 1 auto; min-width:0">
+            <div class="fr-liste-name">${escapeHtml(b.name)}<span class="fr-liste-summe">${b.stueck}×</span></div>
+            <div class="fr-liste-positionen">${b.positionen.map((p) => p.anzahl + "× " + escapeHtml(p.name)).join(", ")}</div>
+            ${b.notiz ? `<div class="fr-liste-notiz">${escapeHtml(b.notiz)}</div>` : ""}
+          </div>
+        </div>`).join("")}
+      <div class="fr-summe-zeile">
+        <span>${tag.anzahlBesteller} ${tag.anzahlBesteller === 1 ? "Besteller" : "Besteller"}</span>
+        <span>${tag.stueckGesamt} Stück</span>
+      </div>
+      <button type="button" class="btn btn-secondary btn-grow" data-fr-export="${escapeHtml(tag.datum)}">📋 Als Text kopieren</button>
+      <p class="hinweis-text" data-fr-export-meldung="${escapeHtml(tag.datum)}"></p>
+    </div>`;
+}
+
+// Export als reiner Text (Michel am 2026-10-01: „Export als Text, rein mit den
+// Bestellmengen“): nur die Mengen je Paket und die Summe – ohne Namen und Preise.
+// ⚠️ Gezählt wird nach PAKET-ID mit dem heutigen Paketnamen – genau wie die
+// Einkaufsliste (tag.gesamt). Bis zur Bugjagd 01.10.2026 wurde nach dem Namen
+// aus dem Beleg gruppiert: nach einer Umbenennung zerfiel ein Paket in zwei
+// Zeilen und der Text passte nicht mehr zur Einkaufsliste. Positionen eines
+// gelöschten Pakets fallen weg, wie dort auch; die Gesamtzahl kommt deshalb
+// aus denselben Zeilen.
+function frExportText(tag, pakete) {
+  const zeilen = ["Frühstück " + tag.tagLang + ", " + tag.label, ""];
+  let gesamt = 0;
+  (pakete || []).forEach((p) => {
+    const n = tag.gesamt[p.id] || 0;
+    if (n <= 0) return;
+    zeilen.push(n + "× " + p.name);
+    gesamt += n;
+  });
+  // ⚠️ Nur die Mengen, keine Namen (Michel: „keine User, nur die Bestellmenge“).
+  zeilen.push("Gesamt: " + gesamt + " Stück");
+  return zeilen.join("\n");
+}
+
+// Abrechnung über alle Morgen: die Liste, mit der kassiert wird.
+function frAbrechnungHtml(z) {
+  if (!z.abrechnung.length) return "";
+  return `
+    <div class="karte-block">
+      <p class="feld-label">Abrechnung – alle Morgen zusammen</p>
+      ${z.abrechnung.map((person) => `
+        <details class="fr-abr-person${person.offenCent ? "" : " bezahlt"}" data-fr-person="${escapeHtml(person.name)}"${frOffenePersonen.has(person.name) ? " open" : ""}>
+          <summary>
+            <span class="fr-abr-name">${escapeHtml(person.name)}</span>
+            <span class="fr-abr-betrag">
+              ${person.offenCent
+                ? `<b>${fruehstueckService.centLabel(person.offenCent)}</b> offen`
+                : `<span class="fr-abr-ok">bezahlt</span>`}
+            </span>
+          </summary>
+          <div class="fr-abr-zeilen">
+            ${person.zeilen.map((zeile) => `
+              <label class="fr-abr-zeile${zeile.bezahlt ? " bezahlt" : ""}">
+                <input type="checkbox" data-fr-bezahlt="${zeile.datum}|${zeile.uid}" ${zeile.bezahlt ? "checked" : ""}>
+                <span class="fr-abr-tag">${escapeHtml(zeile.label)}</span>
+                <span class="fr-abr-was">${zeile.positionen.map((p) => p.anzahl + "× " + escapeHtml(p.name)).join(", ")}</span>
+                <span class="fr-abr-preis">${fruehstueckService.centLabel(zeile.summeCent)}</span>
+              </label>`).join("")}
+            <div class="fr-abr-gesamt">Gesamt: ${fruehstueckService.centLabel(person.summeCent)}</div>
+          </div>
+        </details>`).join("")}
+      <div class="fr-summe-zeile">
+        <span>Noch offen</span>
+        <span>${fruehstueckService.centLabel(z.offenGesamtCent)} von ${fruehstueckService.centLabel(z.summeGesamtCent)}</span>
+      </div>
+    </div>`;
+}
+
+function frWireAbholButtons() {
+  document.querySelectorAll("[data-fr-export]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const z = fruehstueckService.getZustand();
+      const tag = z && z.tage ? z.tage.find((t) => t.datum === btn.dataset.frExport) : null;
+      const meldung = document.querySelector('[data-fr-export-meldung="' + btn.dataset.frExport + '"]');
+      if (!tag) return;
+      const text = frExportText(tag, z.pakete);
+      try {
+        await navigator.clipboard.writeText(text);
+        if (meldung) meldung.textContent = "Kopiert – zum Beispiel in WhatsApp oder eine Mail einfügen.";
+      } catch (e) {
+        // Ohne Zwischenablage (altes iOS, kein https): Text zum Markieren zeigen.
+        if (meldung) {
+          meldung.innerHTML = "";
+          const feld = document.createElement("textarea");
+          feld.className = "eingabe";
+          feld.rows = Math.min(14, text.split("\n").length + 1);
+          feld.value = text;
+          meldung.appendChild(feld);
+          feld.select();
+        }
+      }
+    });
+  });
+  // Abgelehnt: Haken auf den alten Stand zurück und melden (Bugjagd 01.10.2026).
+  document.querySelectorAll("[data-fr-abgeholt]").forEach((cb) => {
+    cb.addEventListener("change", async () => {
+      const [datum, uid] = cb.dataset.frAbgeholt.split("|");
+      const res = await frRufe(() => fruehstueckService.setzeAbgeholt(datum, uid, cb.checked));
+      if (!res.erfolg) { cb.checked = !cb.checked; frZeigeFehler("fr-admin-panel-fehler", res.fehler); }
+    });
+  });
+  document.querySelectorAll("[data-fr-bezahlt]").forEach((cb) => {
+    cb.addEventListener("change", async () => {
+      const [datum, uid] = cb.dataset.frBezahlt.split("|");
+      const res = await frRufe(() => fruehstueckService.setzeBezahlt(datum, uid, cb.checked));
+      if (!res.erfolg) { cb.checked = !cb.checked; frZeigeFehler("fr-admin-panel-fehler", res.fehler); }
+    });
+  });
+  document.querySelectorAll("[data-fr-person]").forEach((d) => {
+    d.addEventListener("toggle", () => {
+      const name = d.dataset.frPerson;
+      if (d.open) frOffenePersonen.add(name);
+      else frOffenePersonen.delete(name);
+    });
+  });
+}
+
+// --- Anlegen -----------------------------------------------------------------
+
+// „3 Tage" sagt niemandem, welche Tage das sind – und „Morgen" als Feldname war
+// von „morgen" (dem Tag nach heute) nicht zu unterscheiden. Deshalb rechnet die
+// Eingabe hier sofort in echte Tage um.
+function frAktualisiereVorschau() {
+  const ziel = frEl("fr-neu-vorschau");
+  if (!ziel) return;
+  const start = frEl("fr-neu-start").value;
+  const anzahl = Math.round(Number(frEl("fr-neu-tage").value));
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !(anzahl >= 1 && anzahl <= fruehstueckService.MAX_TAGE)) {
+    ziel.textContent = "";
+    return;
+  }
+  const tage = [];
+  for (let i = 0; i < anzahl; i++) tage.push(fruehstueckService.datumLabel(fruehstueckService.datumPlus(start, i)));
+  // Kein Satzpunkt am Ende: die Datumskürzel enden selbst schon auf einen Punkt
+  // („So 6.9.") und es stünden sonst zwei nebeneinander.
+  ziel.textContent = "Frühstück gibt es an " + anzahl + " Morgen: " + tage.join(", ");
+}
+
+async function frErstellePlan() {
+  const titel = frEl("fr-neu-titel").value;
+  const startDatum = frEl("fr-neu-start").value;
+  const anzahlTage = frEl("fr-neu-tage").value;
+  const schlussUhr = frMinutenAusZeitInput(frEl("fr-neu-schluss").value, -1);
+  const adminPin = frEl("fr-neu-pin").value;
+
+  const res = await fruehstueckService.erstellePlan({ titel, startDatum, anzahlTage, schlussUhr, adminPin });
+  if (!res.erfolg) { frZeigeFehler("fr-neu-fehler", res.fehler); return; }
+  frZeigeFehler("fr-neu-fehler", "");
+}
+
+// --- Admin-Anmeldung ---------------------------------------------------------
+function frRenderAdmin(z) {
+  frEl("fr-admin-login").style.display = z.istAdmin ? "none" : "";
+  // A3-01: wer nur per Konto (⭐/🛠) Veranstalter ist, braucht hier den PIN.
+  if (typeof zeigeKontoPinHinweis === "function") zeigeKontoPinHinweis("fr-admin-konto-hinweis");
+  frEl("fr-admin-panel").style.display = z.istAdmin ? "" : "none";
+  if (!z.istAdmin) return;
+
+  // ⚠️ Die beiden Einstellungsfelder werden NICHT überschrieben, solange der
+  // Veranstalter darin etwas geändert hat. frRender hängt an jeder fremden
+  // Bestellung UND am 30-Sekunden-Takt des Service; ohne diesen Halt stand nach
+  // einer halben Minute wieder der alte Wert im Feld, „Speichern" las ihn beim
+  // Klick frisch aus und schrieb ihn zurück – lautlos, mit Erfolgsmeldung.
+  // ⚠️ Ein Blick auf document.activeElement reicht dafür nicht: sobald man ins
+  // NACHBARFELD wechselt, ist das erste nicht mehr im Fokus und würde wieder
+  // zurückgesetzt. Deshalb ein Entwurfs-Merker, und zwar je Feld: ein nicht
+  // angefasstes Feld zieht weiter nach, sonst schriebe „Speichern“ dort einen
+  // inzwischen woanders geänderten Wert zurück (Bugjagd 25.09.d T5a-1c).
+  if (!frEinstellungenBeruehrt.has("fr-ein-titel")) frEl("fr-ein-titel").value = z.meta.titel || "";
+  if (!frEinstellungenBeruehrt.has("fr-ein-tage")) frEl("fr-ein-tage").value = z.meta.anzahlTage;
+  if (!frEinstellungenBeruehrt.has("fr-ein-schluss")) frEl("fr-ein-schluss").value = frZeitInputWert(z.meta.schlussUhr);
+
+  // ⚠️ Der Schalter hängt NICHT am Berührt-Merker der beiden Felder daneben:
+  // er schreibt sofort, es gibt also nichts, was ein Live-Update überschreiben
+  // könnte. Nur während er selbst den Fokus hat, bleibt er in Ruhe – sonst
+  // springt er unter dem Finger zurück, wenn jemand anders gerade bestellt.
+  const schalter = frEl("fr-ein-annahme");
+  if (schalter && document.activeElement !== schalter) schalter.checked = z.schalterAn;
+  // Kopfzeile des zugeklappten Kastens: das Wichtigste auf einen Blick.
+  const kurz = frEl("fr-ein-kurz");
+  if (kurz) {
+    kurz.textContent = (z.schalterAn ? "Annahme offen" : "Annahme zu") + " · " + z.meta.anzahlTage +
+      (Number(z.meta.anzahlTage) === 1 ? " Tag" : " Tage") + " · Schluss " + frZeitInputWert(z.meta.schlussUhr) + " Uhr";
+  }
+
+  frRenderPaketeVerwalten(z);
+}
+
+function frRenderPaketeVerwalten(z) {
+  const box = frEl("fr-pakete-verwalten");
+  const kurz = frEl("fr-pakete-kurz");
+  if (kurz) kurz.textContent = z.pakete.length === 1 ? "1 Paket" : z.pakete.length + " Pakete";
+  box.innerHTML = z.pakete.length
+    ? z.pakete.map((p, i) => `
+        <div class="fr-paket-verwalten">
+          <div class="fr-pv-info">
+            <div class="fr-pv-name">${escapeHtml(p.name)}</div>
+            <div class="fr-pv-preis">${p.preisCent ? fruehstueckService.centLabel(p.preisCent) : "kostenlos"}${p.beschreibung ? " · " + escapeHtml(p.beschreibung) : ""}</div>
+          </div>
+          <div class="fr-pv-aktionen">
+            <button type="button" class="mini-btn" data-fr-hoch="${p.id}" ${i === 0 ? "disabled" : ""} title="Nach oben" aria-label="${escapeHtml(p.name)} nach oben">▲</button>
+            <button type="button" class="mini-btn" data-fr-runter="${p.id}" ${i === z.pakete.length - 1 ? "disabled" : ""} title="Nach unten" aria-label="${escapeHtml(p.name)} nach unten">▼</button>
+            <button type="button" class="mini-btn" data-fr-bearbeiten="${p.id}" title="Bearbeiten" aria-label="${escapeHtml(p.name)} bearbeiten">✎</button>
+            <button type="button" class="mini-btn" data-fr-loeschen="${p.id}" title="Löschen" aria-label="${escapeHtml(p.name)} löschen">🗑</button>
+          </div>
+        </div>`).join("")
+    : `<p class="fr-leer-hinweis">Noch keine Pakete.</p>`;
+
+  // ⚠️ Ergebnis auswerten – vorher verpuffte eine Ablehnung still (Bugjagd 01.10.2026).
+  const verschiebe = async (id, richtung) => {
+    const res = await frRufe(() => fruehstueckService.verschiebePaket(id, richtung));
+    frZeigeFehler("fr-pak-fehler", res.erfolg ? "" : res.fehler);
+  };
+  box.querySelectorAll("[data-fr-hoch]").forEach((b) => b.addEventListener("click", () => verschiebe(b.dataset.frHoch, -1)));
+  box.querySelectorAll("[data-fr-runter]").forEach((b) => b.addEventListener("click", () => verschiebe(b.dataset.frRunter, 1)));
+  box.querySelectorAll("[data-fr-loeschen]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Dieses Paket wirklich löschen? Bestehende Bestellungen dieses Pakets fallen dabei weg.")) return;
+    let res;
+    try {
+      res = await fruehstueckService.loeschePaket(b.dataset.frLoeschen);
+    } catch (e) {
+      res = { erfolg: false, fehler: "Löschen hat nicht geklappt: " + ((e && e.message) || e) };
+    }
+    frZeigeFehler("fr-pak-fehler", res && !res.erfolg ? res.fehler : "");
+  }));
+  box.querySelectorAll("[data-fr-bearbeiten]").forEach((b) => b.addEventListener("click", () => {
+    const p = frZustand.pakete.find((x) => x.id === b.dataset.frBearbeiten);
+    if (!p) return;
+    frBearbeitetesPaketId = p.id;
+    frEl("fr-pak-name").value = p.name;
+    frEl("fr-pak-beschreibung").value = p.beschreibung;
+    frEl("fr-pak-preis").value = p.preisCent ? (p.preisCent / 100).toFixed(2).replace(".", ",") : "";
+    frEl("fr-btn-pak-anlegen").textContent = "Paket speichern";
+    frEl("fr-pak-name").scrollIntoView({ block: "center", behavior: "smooth" });
+  }));
+}
+
+// ⚠️ Doppelklick-Sperre: bis Firebase bestätigt, legte ein zweiter Klick ein
+// zweites Paket an (Bugjagd 25.09.d T5b).
+let frPaketLaeuft = false;
+async function frSpeicherePaket() {
+  if (frPaketLaeuft) return;
+  frPaketLaeuft = true;
+  frEl("fr-btn-pak-anlegen").disabled = true;
+  try {
+    await frSpeicherePaketJetzt();
+  } catch (e) {
+    // ⚠️ Vorher nur finally: eine Ausnahme verschwand ohne Meldung (Bugjagd 01.10.2026).
+    console.error("[Frühstück] Paket speichern:", e);
+    frZeigeFehler("fr-pak-fehler", "Speichern abgelehnt – " + ((e && e.message) || "unbekannter Fehler") + ". Bitte noch einmal versuchen.");
+  } finally {
+    frPaketLaeuft = false;
+    frEl("fr-btn-pak-anlegen").disabled = false;
+  }
+}
+
+async function frSpeicherePaketJetzt() {
+  const werte = {
+    name: frEl("fr-pak-name").value,
+    beschreibung: frEl("fr-pak-beschreibung").value,
+    preis: frEl("fr-pak-preis").value,
+  };
+  const res = frBearbeitetesPaketId
+    ? await fruehstueckService.aenderePaket(frBearbeitetesPaketId, werte)
+    : await fruehstueckService.legePaketAn(werte);
+
+  if (!res.erfolg) { frZeigeFehler("fr-pak-fehler", res.fehler); return; }
+  frZeigeFehler("fr-pak-fehler", "");
+  frBearbeitetesPaketId = null;
+  frEl("fr-pak-name").value = "";
+  frEl("fr-pak-beschreibung").value = "";
+  frEl("fr-pak-preis").value = "";
+  frEl("fr-btn-pak-anlegen").textContent = "Paket hinzufügen";
+}
+
+// --- Events -------------------------------------------------------------------
+function frWireEvents() {
+  frEl("fr-btn-erstellen").addEventListener("click", frErstellePlan);
+  frEl("fr-neu-start").addEventListener("input", frAktualisiereVorschau);
+  frEl("fr-neu-tage").addEventListener("input", frAktualisiereVorschau);
+  frEl("fr-btn-pak-anlegen").addEventListener("click", frSpeicherePaket);
+
+  // ⚠️ await: der PIN wird seit dem 15.09.2026 dem SERVER bewiesen, nicht im
+  // Browser verglichen. Ohne await waere `res` ein Promise und `res.erfolg`
+  // undefined -- die Anmeldung saehe dann bei JEDER Eingabe nach Fehlschlag
+  // aus, auch beim richtigen PIN, und die Meldung waere leer.
+  frEl("fr-btn-admin-anmelden").addEventListener("click", async () => {
+    const knopf = frEl("fr-btn-admin-anmelden");
+    knopf.disabled = true;
+    try {
+      const res = await fruehstueckService.authentifiziereAlsAdmin(frEl("fr-admin-pin").value);
+      frZeigeFehler("fr-admin-fehler", res.erfolg ? "" : res.fehler);
+      if (res.erfolg) frEl("fr-admin-pin").value = "";
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
+  // Ab der ersten Änderung gehört das Feld dem Veranstalter, nicht mehr dem
+  // Live-Update (siehe frRenderAdmin).
+  frEl("fr-ein-titel").addEventListener("input", () => { frEinstellungenBeruehrt.add("fr-ein-titel"); });
+  frEl("fr-ein-tage").addEventListener("input", () => { frEinstellungenBeruehrt.add("fr-ein-tage"); });
+  frEl("fr-ein-schluss").addEventListener("input", () => { frEinstellungenBeruehrt.add("fr-ein-schluss"); });
+
+  frEl("fr-ein-annahme").addEventListener("change", async () => {
+    const schalter = frEl("fr-ein-annahme");
+    const res = await frRufe(() => fruehstueckService.setzeAnnahme(schalter.checked));
+    frZeigeFehler("fr-einstellungen-fehler", res.erfolg ? "" : res.fehler);
+    // ⚠️ Abgelehnt: der Schalter zeigt sonst einen Stand, den es nicht gibt –
+    // und frRenderAdmin fasst ihn nicht an, solange er den Fokus hat. Deshalb
+    // hier auf den echten Stand zurück (Bugjagd 01.10.2026).
+    if (!res.erfolg) {
+      const z = fruehstueckService.getZustand();
+      schalter.checked = z.vorhanden ? !!z.schalterAn : false;
+    }
+  });
+
+  frEl("fr-btn-einstellungen-speichern").addEventListener("click", async () => {
+    const res = await frRufe(() => fruehstueckService.setzeEinstellungen({
+      titel: frEl("fr-ein-titel").value,
+      anzahlTage: frEl("fr-ein-tage").value,
+      // -1 statt Standard: leeres Feld soll gemeldet werden, nicht 20:00 werden.
+      schlussUhr: frMinutenAusZeitInput(frEl("fr-ein-schluss").value, -1),
+    }));
+    // Erst wenn es wirklich drin steht, darf das nächste Update die Felder
+    // wieder befüllen. Bei einem Fehler bleibt der Entwurf stehen.
+    if (res.erfolg) frEinstellungenBeruehrt.clear();
+    frZeigeFehler("fr-einstellungen-fehler", res.erfolg ? "" : res.fehler);
+  });
+
+  frEl("fr-btn-leeren").addEventListener("click", async () => {
+    if (!confirm("Alle Frühstücksbestellungen entfernen? Pakete und Einstellungen bleiben stehen.")) return;
+    const res = await frRufe(() => fruehstueckService.leereBestellungen());
+    frZeigeFehler("fr-admin-panel-fehler", res.erfolg ? "" : res.fehler);
+  });
+
+  frEl("fr-btn-plan-loeschen").addEventListener("click", async () => {
+    if (!confirm("Die komplette Frühstücksbestellung löschen? Pakete, Einstellungen und alle Bestellungen sind dann weg. Das lässt sich nicht rückgängig machen.")) return;
+    const res = await frRufe(() => fruehstueckService.loeschePlan());
+    frZeigeFehler("fr-admin-panel-fehler", res.erfolg ? "" : res.fehler);
+    // ⚠️ Die Warnung auf den Anlege-Schirm, nicht in den Admin-Kasten: der
+    // verschwindet mit dem Plan, und die Meldung gleich mit.
+    if (res.warnung) frZeigeFehler("fr-neu-fehler", res.warnung);
+  });
+}
+
+// --- Start ---------------------------------------------------------------------
+(function frInit() {
+  frWireEvents();
+  // Vorschlag für den Anlege-Screen: morgen als erster Frühstücksmorgen.
+  frEl("fr-neu-start").value = fruehstueckService.datumPlus(fruehstueckService.heuteIso(), 1);
+  frAktualisiereVorschau();
+  fruehstueckService.onZustandsAenderung(frRender);
+})();
