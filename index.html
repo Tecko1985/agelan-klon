@@ -12,11 +12,15 @@
 <!-- Verbindungen zu Firebase schon aufbauen, während das Passwort geprüft wird. -->
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <script src="thema.js?v=1.0"></script>
+<!-- KLON: ?eingebettet=1 = läuft im iframe der AGE-LAN-Website. Dann ohne
+     eigenen Kopf, ohne Vorraum und ohne Klon-Hinweis – die Website ist der Rahmen. -->
+<script>try { if (/[?&]eingebettet=1(?:&|$)/.test(location.search)) document.documentElement.classList.add('eingebettet'); } catch (e) {}</script>
+<style>.eingebettet .klon-band, .eingebettet .kopfzeile, .eingebettet #start-hub { display: none !important; }</style>
 <!-- Zwangsaktualisierung: neue Fassung online → Seite lädt neu (siehe Datei). -->
 <script src="aktualisieren.js?v=1.1"></script>
 </head>
 <body>
-<div style="background:repeating-linear-gradient(45deg,#fff4d6,#fff4d6 12px,#ffeab0 12px,#ffeab0 24px);color:#6b4b00;text-align:center;font:600 13px system-ui,sans-serif;padding:6px 12px;border-bottom:1px solid #e5c56a">🧪 Klon der AgeLan-App – angebunden an die <a href="https://tecko1985.github.io/agelan-backend/" style="color:#6b4b00">AGE-LAN-Website</a>. Daten vorerst nur in diesem Browser.</div>
+<div class="klon-band" style="background:repeating-linear-gradient(45deg,#fff4d6,#fff4d6 12px,#ffeab0 12px,#ffeab0 24px);color:#6b4b00;text-align:center;font:600 13px system-ui,sans-serif;padding:6px 12px;border-bottom:1px solid #e5c56a">🧪 Klon der AgeLan-App – angebunden an die <a href="https://tecko1985.github.io/agelan-backend/" style="color:#6b4b00">AGE-LAN-Website</a>. Daten vorerst nur in diesem Browser.</div>
 
 <!-- Vorraum: für alle offen. Zeigt, was es auf der AgeLan gibt, ohne dass dafür
      ein Passwort nötig wäre. Erst der Klick auf einen Bereich öffnet die
