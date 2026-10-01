@@ -76,3 +76,6 @@ html.eingebettet .thema-block { display: none !important; }
 
 /* QR-Knopf in der Reiterleiste entfällt: die Website hat eigene Ticket-QR-Codes. */
 html.eingebettet #nav-qr { display: none !important; }
+
+/* Navigation übernimmt die Website (Kacheln über dem Rahmen) – Reiterleiste der App ausblenden. */
+html.eingebettet nav.tabs { display: none !important; }
