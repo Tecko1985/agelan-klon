@@ -11,8 +11,10 @@
   if (!document.documentElement.classList.contains("eingebettet")) return;
 
   // Bildzeichen samt Variations-Selektor, Hautfarben, ZWJ-Folgen und Keycaps.
-  var EMOJI = /(?:[\u{1F1E6}-\u{1F1FF}]{2}|(?:\p{Extended_Pictographic}|[0-9#*]️?⃣)(?:️|[\u{1F3FB}-\u{1F3FF}])?(?:‍\p{Extended_Pictographic}(?:️|[\u{1F3FB}-\u{1F3FF}])?)*)[  ]?/gu;
-  var PRUEFEN = /\p{Extended_Pictographic}|⃣|[\u{1F1E6}-\u{1F1FF}]/u;
+  // Nur was als buntes Emoji erscheint (Emoji_Presentation oder mit U+FE0F) –
+  // Textzeichen wie ©, ™, ▶ oder ✔ bleiben stehen.
+  var EMOJI = /(?:[\u{1F1E6}-\u{1F1FF}]{2}|(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}️|[0-9#*]️?⃣)(?:️|[\u{1F3FB}-\u{1F3FF}])?(?:‍\p{Extended_Pictographic}(?:️|[\u{1F3FB}-\u{1F3FF}])?)*)[  ]?/gu;
+  var PRUEFEN = /\p{Emoji_Presentation}|️|⃣|[\u{1F1E6}-\u{1F1FF}]/u;
   var NICHT = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, INPUT: 1, OPTION: 0, CODE: 1, PRE: 1 };
 
   function nurEmoji(el) {

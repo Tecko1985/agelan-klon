@@ -124,7 +124,8 @@
 
   // Änderungen aus anderen Tabs
   window.addEventListener("storage", (e) => {
-    if (e.key === DB_KEY) notifyAll();
+    // KLON: index.html legt localStorage-Schlüssel unter "klon:" ab.
+    if (e.key === DB_KEY || e.key === "klon:" + DB_KEY) notifyAll();
   });
 
   // --- Reference -----------------------------------------------------------

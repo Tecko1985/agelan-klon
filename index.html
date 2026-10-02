@@ -8,6 +8,23 @@
 <meta name="theme-color" content="#1b2d4f">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css?v=6.18">
+<!-- KLON: eigener Speicherbereich. Live-App (/agelan/), Klon und Website liegen
+     alle unter tecko1985.github.io und teilen sich localStorage. Ohne Präfix
+     überschreibt der Klon die Anmeldung der Live-App (agelan_konto) und
+     umgekehrt. Deshalb landet jeder Schlüssel des Klons unter "klon:<name>".
+     Muss VOR allen anderen Skripten stehen. -->
+<script>
+(function () {
+  try {
+    var S = Storage.prototype, roh = { get: S.getItem, set: S.setItem, weg: S.removeItem };
+    var lokal = window.localStorage;
+    var k = function (s, name) { return s === lokal ? "klon:" + name : name; };
+    S.getItem = function (name) { return roh.get.call(this, k(this, name)); };
+    S.setItem = function (name, wert) { return roh.set.call(this, k(this, name), wert); };
+    S.removeItem = function (name) { return roh.weg.call(this, k(this, name)); };
+  } catch (e) {}
+})();
+</script>
 <!-- Hell/Dunkel VOR dem ersten Zeichnen setzen (sonst blitzt es nachts hell). -->
 <!-- Verbindungen zu Firebase schon aufbauen, während das Passwort geprüft wird. -->
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -28,8 +45,8 @@ try {
 } catch (e) {}
 </script>
 <link rel="stylesheet" href="eingebettet.css?v=4">
-<script src="ohne-emojis.js?v=1"></script>
-<script src="ohne-pin.js?v=1"></script>
+<script src="ohne-emojis.js?v=2"></script>
+<script src="ohne-pin.js?v=2"></script>
 <style>.eingebettet .klon-band, .eingebettet .kopfzeile, .eingebettet #start-hub { display: none !important; }</style>
 <!-- Zwangsaktualisierung: neue Fassung online → Seite lädt neu (siehe Datei). -->
 <script src="aktualisieren.js?v=1.1"></script>
@@ -1424,7 +1441,7 @@ try {
     'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
     'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js',
     'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
-    'firebase-mock.js?v=1.0',
+    'firebase-mock.js?v=1.1',
     'firebase-config.js?v=1.0',
     'verbindung.js?v=1.0',
     'turnier-service.js?v=2.20',

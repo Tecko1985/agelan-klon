@@ -271,7 +271,7 @@ function json(daten, status, cors) {
 // ===========================================================================
 
 const NICK_MIN = 2;
-const NICK_MAX = 20;
+const NICK_MAX = 24;   // KLON: wie auf der Website
 const PW_MIN = 4;              // Fun-Event, kein Bankkonto – aber nicht leer
 const TOKEN_TAGE = 120;        // deckt eine Veranstaltung samt Vorlauf ab
 const PBKDF2_RUNDEN = 100000;
@@ -484,8 +484,8 @@ function nickPruefen(nick) {
   const n = String(nick == null ? "" : nick).trim();
   if (n.length < NICK_MIN) return { fehler: "Der Name braucht mindestens " + NICK_MIN + " Zeichen." };
   if (n.length > NICK_MAX) return { fehler: "Der Name darf höchstens " + NICK_MAX + " Zeichen haben." };
-  if (!/^[\wÄÖÜäöüß .\-]+$/u.test(n)) {
-    return { fehler: "Erlaubt sind Buchstaben, Zahlen, Punkt, Bindestrich und Leerzeichen." };
+  if (!/^[\p{L}\p{N}_\-. ]+$/u.test(n)) {   // KLON: wie auf der Website
+    return { fehler: "Erlaubt sind Buchstaben, Ziffern, Leerzeichen und _ - ." };
   }
   return { nick: n };
 }
@@ -501,8 +501,9 @@ function kvDa(env) {
 async function tokenSchluessel(env) {
   let roh = await env.KONTEN.get("_tokenSecret");
   if (!roh) {
-    roh = bytesZuB64(crypto.getRandomValues(new Uint8Array(32)));
-    await env.KONTEN.put("_tokenSecret", roh);
+    await env.KONTEN.put("_tokenSecret", bytesZuB64(crypto.getRandomValues(new Uint8Array(32))));
+    // KLON: neu lesen – hat die Website im selben Moment eins angelegt, gilt das.
+    roh = await env.KONTEN.get("_tokenSecret");
   }
   return crypto.subtle.importKey(
     "raw", b64ZuBytes(roh), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]
@@ -517,6 +518,9 @@ async function tokenSchluessel(env) {
 // konto-pruefen dem alten Token sogar ein frisches mit den Rechten des Nachfolgers.
 async function tokenBauen(env, nick, admin, streamer, orga, angelegtAm) {
   const nutzlast = { n: nick, e: Date.now() + TOKEN_TAGE * 86400000, t: Number(angelegtAm) || 0 };
+  // KLON: v = token_ver des Website-Kontos (steigt bei Passwortwechsel/-reset).
+  const vorhanden = await env.KONTEN.get(nickSchluessel(nick));
+  try { nutzlast.v = vorhanden ? Number(JSON.parse(vorhanden).tokenVer) || 0 : 0; } catch (e) { nutzlast.v = 0; }
   if (admin) nutzlast.a = 1;
   if (streamer) nutzlast.s = 1;
   // ⚠️ `orga` entscheidet ueber Geld (wer beim Essen nichts zahlt) und gehoert
@@ -550,7 +554,8 @@ async function tokenLesen(env, token) {
     const nutzlast = JSON.parse(new TextDecoder().decode(b64UrlZuBytes(teile[0])));
     if (!nutzlast || !nutzlast.n || !(nutzlast.e > Date.now())) return null;
     return { nick: nutzlast.n, admin: nutzlast.a === 1, streamer: nutzlast.s === 1, orga: nutzlast.o === 1,
-             t: typeof nutzlast.t === "number" ? nutzlast.t : null };
+             t: typeof nutzlast.t === "number" ? nutzlast.t : null,
+             v: typeof nutzlast.v === "number" ? nutzlast.v : null };
   } catch (e) {
     return null;
   }
@@ -559,7 +564,8 @@ async function tokenLesen(env, token) {
 // B2-11: passt das (gueltig signierte) Token zu DIESEM Konto? Alte Token ohne `t` (vor dem
 // 26.09.2026 ausgestellt) gelten als abgelaufen - einmal neu anmelden.
 function tokenPasstZuKonto(gelesen, konto) {
-  return !!gelesen && !!konto && typeof gelesen.t === "number" && gelesen.t === (Number(konto.angelegtAm) || 0);
+  return !!gelesen && !!konto && typeof gelesen.t === "number" && gelesen.t === (Number(konto.angelegtAm) || 0)
+    && gelesen.v === (Number(konto.tokenVer) || 0);   // KLON: Passwortwechsel auf der Website
 }
 
 async function kontoAnlegen(request, body, env, cors, ctx) {
@@ -723,9 +729,11 @@ async function kontoPruefen(body, env, cors) {
   let orga = false;
   let discordId = "";
   let angelegtAm = 0;
+  let tokenVer = 0;
   try {
     const k = JSON.parse(roh);
     angelegtAm = Number(k.angelegtAm) || 0;
+    tokenVer = Number(k.tokenVer) || 0;
     admin = !!k.admin;
     streamer = !!k.streamer;
     orga = !!k.orga;
@@ -733,7 +741,7 @@ async function kontoPruefen(body, env, cors) {
   } catch (e) { /* kaputter Eintrag gilt als ohne Rechte */ }
   orga = orga || admin;   // Veranstalter gehoeren immer dazu
   // B2-11: gleicher Name, aber ein NEUES Konto -> das alte Token gilt nicht mehr.
-  if (!tokenPasstZuKonto(gelesen, { angelegtAm: angelegtAm })) return json({ ok: false }, 200, cors);
+  if (!tokenPasstZuKonto(gelesen, { angelegtAm: angelegtAm, tokenVer: tokenVer })) return json({ ok: false }, 200, cors);
 
   // Weicht der Stand vom Token ab, bekommt der Client ein frisches.
   const abweichend = admin !== gelesen.admin || streamer !== gelesen.streamer || orga !== gelesen.orga;
@@ -747,6 +755,10 @@ async function kontoPruefen(body, env, cors) {
 
 // Ein bestehendes Konto zum Veranstalter machen (oder das Recht wieder abgeben).
 async function kontoAdmin(request, body, env, cors) {
+  // KLON: Rollen (Veranstalter, Orga, Streamer) vergibt nur die Website –
+  // sonst könnte die App an ADMIN_SETUP vorbei Website-Rechte verteilen.
+  return json({ error: "Rollen verwaltest du auf der AGE-LAN-Website (Verwaltung → Benutzer)." }, 400, cors);
+  // eslint-disable-next-line no-unreachable
   if (!kvDa(env)) return json({ error: "Konten sind noch nicht eingerichtet." }, 500, cors);
   if (!bremseOffen(request)) {
     return json({ error: "Zu viele Fehlversuche. Bitte später erneut versuchen." }, 429, cors);
@@ -799,6 +811,10 @@ async function kontoAdmin(request, body, env, cors) {
 // Streamer-Merkmal setzen oder nehmen. Nur der Veranstalter - anders als beim
 // Veranstalter-Recht gibt es hier keinen Selbstbedienungsweg per Passwort.
 async function kontoStreamer(request, body, env, cors) {
+  // KLON: Rollen (Veranstalter, Orga, Streamer) vergibt nur die Website –
+  // sonst könnte die App an ADMIN_SETUP vorbei Website-Rechte verteilen.
+  return json({ error: "Rollen verwaltest du auf der AGE-LAN-Website (Verwaltung → Benutzer)." }, 400, cors);
+  // eslint-disable-next-line no-unreachable
   if (!kvDa(env)) return json({ error: "Konten sind noch nicht eingerichtet." }, 500, cors);
   const erlaubt = await veranstalterOk(request, body, env);
   if (!erlaubt.ok) return json({ error: erlaubt.fehler }, erlaubt.status, cors);
@@ -830,6 +846,10 @@ async function kontoStreamer(request, body, env, cors) {
 // Veranstaltung aus und gehoert damit zur Organisation. Der Weg dorthin ist,
 // ihm zuerst das Veranstalter-Recht zu nehmen.
 async function kontoOrga(request, body, env, cors) {
+  // KLON: Rollen (Veranstalter, Orga, Streamer) vergibt nur die Website –
+  // sonst könnte die App an ADMIN_SETUP vorbei Website-Rechte verteilen.
+  return json({ error: "Rollen verwaltest du auf der AGE-LAN-Website (Verwaltung → Benutzer)." }, 400, cors);
+  // eslint-disable-next-line no-unreachable
   if (!kvDa(env)) return json({ error: "Konten sind noch nicht eingerichtet." }, 500, cors);
   const erlaubt = await veranstalterOk(request, body, env);
   if (!erlaubt.ok) return json({ error: erlaubt.fehler }, erlaubt.status, cors);
@@ -921,11 +941,13 @@ async function kontoListe(request, body, env, cors) {
   if (!erlaubt.ok) return json({ error: erlaubt.fehler }, erlaubt.status, cors);
 
   const liste = [];
+  // KLON: alle Konten in EINER Abfrage (sonst je Konto eine – D1 erlaubt nur 50 pro Aufruf).
+  const alle = await env.KONTEN.alleFreigegebenen();
   let cursor;
   do {
-    const seite = await env.KONTEN.list({ prefix: "konto:", cursor: cursor });
+    const seite = { keys: alle, list_complete: true };
     for (const k of seite.keys) {
-      const roh = await env.KONTEN.get(k.name);
+      const roh = k.wert;
       if (!roh) continue;
       try {
         const konto = JSON.parse(roh);
@@ -1492,13 +1514,15 @@ const WEBSITE = "https://tecko1985.github.io/agelan-backend/";
 // Nicht freigeschaltete Konten gibt es für die App schlicht nicht (get → null),
 // damit greift jede Prüfung des Originals automatisch.
 function d1Konten(db) {
-  const zeile = (nickKey) => db.prepare(`SELECT u.*, EXISTS(SELECT 1 FROM tickets t JOIN lans l ON l.id = t.lan_id
-      WHERE t.user_id = u.id AND l.aktiv = 1 AND t.status != 'storniert' AND t.checkin_at IS NOT NULL) AS eingecheckt
-      FROM users u WHERE u.nick_key = ?`).bind(nickKey).first();
+  const SPALTEN = `u.*, EXISTS(SELECT 1 FROM tickets t JOIN lans l ON l.id = t.lan_id
+      WHERE t.user_id = u.id AND l.aktiv = 1 AND t.status != 'storniert' AND t.checkin_at IS NOT NULL) AS eingecheckt,
+      (SELECT value FROM settings WHERE key = 'klon:dtest:' || u.nick_key) AS dtest`;
+  const zeile = (nickKey) => db.prepare(`SELECT ${SPALTEN} FROM users u WHERE u.nick_key = ?`).bind(nickKey).first();
   const freigegeben = (u) => !u.gesperrt && (u.rolle === "admin" || u.rolle === "orga" || !!u.streamer || !!u.eingecheckt);
   const alsKonto = (u) => JSON.stringify({
     nick: u.nick, pw: u.pw, admin: u.rolle === "admin", orga: u.rolle === "orga",
     streamer: !!u.streamer, discordId: u.discord_id || "", angelegtAm: u.created_at,
+    tokenVer: Number(u.token_ver) || 0, discordTestZuletzt: Number(u.dtest) || 0,
   });
   return {
     async get(key) {
@@ -1512,15 +1536,17 @@ function d1Konten(db) {
     },
     async put(key, wert) {
       if (key === "_tokenSecret") {
-        await db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('klon:tokenSecret', ?)").bind(String(wert)).run();
+        await db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('klon:tokenSecret', ?)").bind(String(wert)).run();
         return;
       }
       if (!String(key).startsWith("konto:")) return;
       const k = JSON.parse(wert);
-      // Nur Rollen, Streamer und Discord-ID – Name und Passwort gehören der Website.
-      const r = await db.prepare("UPDATE users SET rolle = ?, streamer = ?, discord_id = ? WHERE nick_key = ?")
-        .bind(k.admin ? "admin" : k.orga ? "orga" : "user", k.streamer ? 1 : 0, String(k.discordId || ""), String(key).slice(6)).run();
-      if (!r.meta || !r.meta.changes) throw new Error("Konto nicht gefunden");
+      const nickKey = String(key).slice(6);
+      // Nur die Discord-ID (und die Test-Bremse). Rollen, Name und Passwort gehören der Website.
+      await db.prepare("UPDATE users SET discord_id = ? WHERE nick_key = ?").bind(String(k.discordId || ""), nickKey).run();
+      if (k.discordTestZuletzt) {
+        await db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind("klon:dtest:" + nickKey, String(k.discordTestZuletzt)).run();
+      }
     },
     async delete(key) {
       if (key === "_tokenSecret") await db.prepare("DELETE FROM settings WHERE key = 'klon:tokenSecret'").run();
@@ -1528,6 +1554,10 @@ function d1Konten(db) {
     async list() {
       const r = await db.prepare("SELECT nick_key FROM users ORDER BY nick_key").all();
       return { keys: (r.results || []).map((x) => ({ name: "konto:" + x.nick_key })), list_complete: true };
+    },
+    async alleFreigegebenen() {
+      const r = await db.prepare(`SELECT ${SPALTEN} FROM users u ORDER BY u.nick_key`).all();
+      return (r.results || []).filter(freigegeben).map((u) => ({ name: "konto:" + u.nick_key, wert: alsKonto(u) }));
     },
     async ohneFreigabe(nick) {
       const u = await zeile(String(nick).trim().toLowerCase());
